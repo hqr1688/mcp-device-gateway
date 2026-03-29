@@ -1,0 +1,54 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build and packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and runtime artifacts
+*.log
+mcp_audit.log
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# 测试/临时传输文件
+mcp_transfer_test*.txt
+
+# 私有设备配置（包含密钥路径/密码，不应提交）
+# 建议使用 devices.local.yaml 或 devices.production.yaml 作为本地配置文件名
+devices.local.yaml
+devices.production.yaml
+
+# Notebook checkpoints
+.ipynb_checkpoints/

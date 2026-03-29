@@ -1,0 +1,101 @@
+# =============================================================================
+# mcp-device-gateway — 生产环境最小授权配置模板
+# =============================================================================
+# 使用前请将以下占位符替换为真实值：
+#
+#   <DEVICE_IP>   目标设备 IP 地址或 hostname
+#   <USERNAME>    SSH 登录账号（建议使用专用部署账号，而非 root）
+#
+# --------------------------------------------------------------------------
+# 第一步：生成 SSH 密钥对（本机执行，若已有密钥对可跳过）
+#   ssh-keygen -t ed25519 -f C:/keys/devkit_id_ed25519
+#
+# 第二步：将公钥追加到设备受信列表
+#   # 在设备上执行：
+#   mkdir -p ~/.ssh && cat << 'EOF' >> ~/.ssh/authorized_keys
+#   <粘贴 C:/keys/devkit_id_ed25519.pub 的内容>
+#   EOF
+#   chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+#
+# 第三步：采集设备主机指纹，写入本地 known_hosts
+#   ssh-keyscan -H <DEVICE_IP> >> C:/keys/known_hosts
+#   # 非默认端口时：
+#   ssh-keyscan -p <PORT> -H <DEVICE_IP> >> C:/keys/known_hosts
+#
+# known_hosts 配置后，ssh_client.py 将使用 RejectPolicy：
+#   - 指纹匹配 → 连接成功
+#   - 指纹不匹配 → 立即拒绝（防止中间人攻击）
+#   - 未配置 known_hosts → 使用 AutoAddPolicy（仅建议用于内网开发环境）
+# =============================================================================
+
+devices:
+
+  # ---------------------------------------------------------------------------
+  # 单设备示例：最小授权，仅开放应用目录与临时目录
+  # ---------------------------------------------------------------------------
+  devkit-prod:
+    host: <DEVICE_IP>
+    port: 22
+    username: <USERNAME>
+
+    # 优先使用密钥认证，生产环境禁止使用明文密码
+    key_file: C:/keys/devkit_id_ed25519
+    password: null
+
+    # 强制主机指纹校验，见第三步
+    known_hosts: C:/keys/known_hosts
+
+    # allowed_roots 仅开放必要目录
+    # 重要：若设置为空列表 [] 则不限制路径——生产环境禁止此用法
+    allowed_roots:
+      - /opt/app/
+      - /tmp/
+
+  # ---------------------------------------------------------------------------
+  # 多设备示例：为多个目标复用同一 known_hosts
+  # ---------------------------------------------------------------------------
+  devkit-staging:
+    host: <STAGING_IP>
+    port: 22
+    username: deploy
+    key_file: C:/keys/staging_id_ed25519
+    password: null
+    known_hosts: C:/keys/known_hosts
+    allowed_roots:
+      - /opt/app/
+      - /var/log/app/
+      - /tmp/
+
+
+# =============================================================================
+# 命令模板
+# =============================================================================
+# 安全规则：
+#   - 只声明业务所需的命令，不暴露通用 shell 能力
+#   - 参数占位符使用 {0}、{1}（template.format(*args) 展开）
+#   - args 在执行前会按正则 ^[a-zA-Z0-9_./:=+\-]+$ 做 fullmatch 校验
+#   - 禁止在模板中拼接未经校验的字符串
+# =============================================================================
+
+command_templates:
+
+  # --- 健康检查 ---
+  health_check: "uname -a; uptime"
+  disk_usage:   "df -h"
+  mem_usage:    "free -m"
+
+  # --- 服务管理（按需开放，最小化授权）---
+  # 调用示例：cmd_exec(device_name="devkit-prod", command_key="service_status", args=["app"])
+  service_status:  "systemctl status {0} --no-pager"
+  service_restart: "systemctl restart {0}"
+  service_stop:    "systemctl stop {0}"
+
+  # --- 日志查看 ---
+  # 调用示例：cmd_exec(command_key="tail_log", args=["100"])
+  tail_log:     "tail -n {0} /var/log/app/app.log"
+  list_log_dir: "ls -al /var/log/app/"
+
+  # --- 应用目录与进程 ---
+  list_app_dir: "ls -al /opt/app/"
+  # 调用示例：cmd_exec(command_key="app_process", args=["myapp"])
+  app_process:  "ps -ef | grep {0} | grep -v grep"

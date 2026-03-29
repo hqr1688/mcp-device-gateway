@@ -1,0 +1,38 @@
+devices:
+  devkit-01:
+    host: 192.168.200.218
+    port: 22
+    username: root
+    password: "123456"
+    key_file: null
+    known_hosts: null
+    allowed_roots:
+      - /
+
+command_templates:
+  health_check: "uname -a; uptime"
+  restart_idm: "systemctl restart idm"
+  idm_status: "systemctl status idm --no-pager"
+  run_idm: "cd /opt/idm && ./displacementMeter.c308x"
+  list_idm_dir: "ls -al /opt/idm"
+  list_tmp_dir: "ls -al /tmp"
+  list_dir: "ls -al {0}"
+  read_file: "cat {0}"
+  idm_log_list: "ls -al /opt/idm/log"
+  idm_process: "ps -ef | grep displacementMeter.c308x | grep -v grep"
+  disk_usage: "df -h"
+  mem_usage: "free -m"
+
+# cmd.exec 的 args 会按正则校验：^[a-zA-Z0-9_./:=+-]+$
+# 模板可通过 {0}、{1}... 引用参数
+  run_make: "cd /opt/idm && make {0}"
+
+# Amlogic unifykeys 读取（usid/deviceid 是设备唯一ID，mac_bt/mac_wifi 是无线MAC）
+  hw_cpu_serial: "grep Serial /proc/cpuinfo"
+  hw_emmc_cid: "cat /sys/class/block/mmcblk2/device/cid"
+  hw_eth0_mac: "cat /sys/class/net/eth0/address"
+  hw_usid: "sh -c 'echo usid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_deviceid: "sh -c 'echo deviceid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_mac_bt: "sh -c 'echo mac_bt > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_mac_wifi: "sh -c 'echo mac_wifi > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_region_code: "sh -c 'echo region_code > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
