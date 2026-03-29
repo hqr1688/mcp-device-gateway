@@ -1,0 +1,43 @@
+# Qualcomm 平台命令模板
+# 适用 SoC：IPQ40xx/IPQ60xx/IPQ80xx（网络设备），QCS/QCM 系列（工业边缘）
+# 典型系统：OpenWrt, Linux Yocto, Android 衍生系统
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  sys_uname:            "uname -a"
+  sys_uptime:           "uptime"
+  sys_mem_usage:        "free -m"
+  sys_disk_usage:       "df -h"
+  sys_cpu_info:         "cat /proc/cpuinfo"
+  soc_model:            "cat /proc/device-tree/model"
+  soc_compatible:       "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+  sys_dmesg_tail:       "dmesg | tail -n {0}"
+  sys_dmesg_grep:       "dmesg | grep {0}"
+
+  temp_all:             "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+
+  # Qualcomm 网络加速/NSS 常见检查
+  nss_modules:          "lsmod | grep -E 'qca_nss|nss'"
+  nss_dmesg:            "dmesg | grep -i nss"
+
+  wifi_chip_info:       "dmesg | grep -i -E 'ath11k|ath10k|qca'"
+  wifi_status:          "iw dev"
+  wifi_link:            "iw dev wlan0 link"
+
+  net_ip_addr:          "ip addr"
+  net_ip_route:         "ip route"
+  net_stats:            "cat /proc/net/dev"
+  ping_test:            "ping -c 4 {0}"
+
+  storage_devices:      "ls -l /dev/mmcblk* /dev/sd*"
+  mtd_list:             "cat /proc/mtd"
+
+  svc_status:           "systemctl status {0} --no-pager"
+  svc_restart:          "systemctl restart {0}"
+  svc_list:             "systemctl list-units --type=service --no-pager"
+
+  proc_all:             "ps -ef"
+  proc_grep:            "ps -ef | grep {0} | grep -v grep"
+  proc_top:             "top -bn1 | head -20"

@@ -1,0 +1,126 @@
+# Rockchip SoC 平台命令模板
+# 适用芯片：RK3399, RK3568, RK3566, RK3588, RK3588S, RV1109, RV1126, RK3399Pro 等
+# 典型系统：Buildroot, Debian, Ubuntu, Yocto on Rockchip
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # ─────────────────────────────────────────────────────────
+  # 系统信息
+  # ─────────────────────────────────────────────────────────
+  sys_uname:          "uname -a"
+  sys_uptime:         "uptime"
+  sys_cpu_info:       "cat /proc/cpuinfo"
+  sys_mem_usage:      "free -m"
+  sys_disk_usage:     "df -h"
+  sys_dmesg_tail:     "dmesg | tail -n {0}"
+  sys_dmesg_grep:     "dmesg | grep {0}"
+  sys_cmdline:        "cat /proc/cmdline"
+  soc_model:          "cat /proc/device-tree/compatible | tr '\\0' '\\n' | head -3"
+  board_model:        "cat /proc/device-tree/model"
+  fw_version:         "cat /etc/os-release"
+
+  # ─────────────────────────────────────────────────────────
+  # 温度监控
+  # ─────────────────────────────────────────────────────────
+  # RK3588 有 CPU/GPU/NPU 多个热区
+  temp_all:           "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
+  temp_cpu:           "cat /sys/class/thermal/thermal_zone0/temp"
+  temp_gpu:           "cat /sys/class/thermal/thermal_zone1/temp"
+  # RK3588/Pro NPU 温度
+  temp_npu:           "cat /sys/class/thermal/thermal_zone2/temp"
+
+  # ─────────────────────────────────────────────────────────
+  # CPU 频率 & 性能
+  # ─────────────────────────────────────────────────────────
+  # RK3588 含大核(A76)和小核(A55)，路径分别为 cpu0(小) 和 cpu6(大)
+  cpu_big_freq_cur:   "cat /sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq"
+  cpu_big_freq_max:   "cat /sys/devices/system/cpu/cpu6/cpufreq/cpuinfo_max_freq"
+  cpu_little_freq_cur: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+  cpu_little_freq_max: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+  cpu_governor:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  cpu_set_governor:   "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  cpu_available_governors: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+
+  # ─────────────────────────────────────────────────────────
+  # GPU（Mali G610 on RK3588 / Mali T860 on RK3399）
+  # ─────────────────────────────────────────────────────────
+  gpu_freq_cur:       "cat /sys/class/devfreq/fb000000.gpu/cur_freq"
+  gpu_freq_max:       "cat /sys/class/devfreq/fb000000.gpu/max_freq"
+  gpu_governor:       "cat /sys/class/devfreq/fb000000.gpu/governor"
+  gpu_utilization:    "cat /sys/class/devfreq/fb000000.gpu/load"
+
+  # ─────────────────────────────────────────────────────────
+  # NPU（RKNN，RK3588/RK3399Pro/RV1109/RV1126 含 NPU）
+  # ─────────────────────────────────────────────────────────
+  npu_freq_cur:       "cat /sys/kernel/debug/rknpu/load"
+  npu_driver:         "cat /sys/module/rknpu/version"
+  # RKNN runtime 版本（需安装 rknn-toolkit2）
+  npu_runtime_ver:    "python3 -c 'import rknn; print(rknn.__version__)'"
+
+  # ─────────────────────────────────────────────────────────
+  # 存储（eMMC / UFS）
+  # ─────────────────────────────────────────────────────────
+  storage_list:       "ls -l /dev/mmcblk*"
+  emmc_life:          "cat /sys/class/block/mmcblk0/device/life_time"
+  emmc_enhanced_area: "cat /sys/class/block/mmcblk0/device/enhanced_area_offset"
+  emmc_partitions:    "cat /proc/partitions | grep mmcblk"
+  flash_partitions:   "cat /proc/mtd"
+
+  # ─────────────────────────────────────────────────────────
+  # 硬件身份
+  # ─────────────────────────────────────────────────────────
+  hw_cpu_serial:      "grep Serial /proc/cpuinfo"
+  hw_eth0_mac:        "cat /sys/class/net/eth0/address"
+  hw_eth1_mac:        "cat /sys/class/net/eth1/address"
+
+  # ─────────────────────────────────────────────────────────
+  # 网络
+  # ─────────────────────────────────────────────────────────
+  net_ip_addr:        "ip addr"
+  net_ip_route:       "ip route"
+  net_stats:          "cat /proc/net/dev"
+  wifi_status:        "iw dev wlan0 info"
+  wifi_link:          "iw dev wlan0 link"
+  ping_test:          "ping -c 4 {0}"
+
+  # ─────────────────────────────────────────────────────────
+  # 服务管理（systemd）
+  # ─────────────────────────────────────────────────────────
+  svc_status:         "systemctl status {0} --no-pager"
+  svc_start:          "systemctl start {0}"
+  svc_stop:           "systemctl stop {0}"
+  svc_restart:        "systemctl restart {0}"
+  svc_list:           "systemctl list-units --type=service --no-pager"
+  svc_failed:         "systemctl list-units --state=failed --no-pager"
+  journal_tail:       "journalctl -n {0} --no-pager"
+  journal_svc:        "journalctl -u {0} -n 50 --no-pager"
+
+  # ─────────────────────────────────────────────────────────
+  # 进程
+  # ─────────────────────────────────────────────────────────
+  proc_all:           "ps -ef"
+  proc_grep:          "ps -ef | grep {0} | grep -v grep"
+  proc_top:           "top -bn1 | head -20"
+
+  # ─────────────────────────────────────────────────────────
+  # RKDevTool / 烧录辅助（需安装 rkdeveloptool 或 upgrade_tool）
+  # ─────────────────────────────────────────────────────────
+  # 注：以下命令通常需要设备以 Maskrom 或 Loader 模式连接 USB，
+  #     在 Linux 主机侧执行，而非设备内部执行
+  # rk_tool_version: "rkdeveloptool version"
+  # rk_device_list:  "rkdeveloptool ld"
+
+  # ─────────────────────────────────────────────────────────
+  # ISP & Camera（RK3588/RV1126 含 ISP）
+  # ─────────────────────────────────────────────────────────
+  isp_version:        "cat /sys/module/video_rkisp/version"
+  camera_list:        "ls /dev/video*"
+
+  # ─────────────────────────────────────────────────────────
+  # 电源管理
+  # ─────────────────────────────────────────────────────────
+  power_domains:      "cat /sys/kernel/debug/pm_genpd/pm_genpd_summary"
+  suspend_state:      "cat /sys/power/state"
+  clk_summary:        "cat /sys/kernel/debug/clk/clk_summary | head -60"

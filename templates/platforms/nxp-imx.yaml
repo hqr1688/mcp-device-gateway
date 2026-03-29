@@ -1,0 +1,74 @@
+# NXP i.MX 平台命令模板
+# 适用芯片：i.MX6ULL/6Q, i.MX7, i.MX8M Mini/Nano/Plus, i.MX93
+# 典型系统：Yocto, Debian, Ubuntu, Buildroot
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # 系统基础
+  sys_uname:          "uname -a"
+  sys_uptime:         "uptime"
+  sys_os_release:     "cat /etc/os-release"
+  sys_cpu_info:       "cat /proc/cpuinfo"
+  sys_mem_usage:      "free -m"
+  sys_disk_usage:     "df -h"
+  sys_dmesg_tail:     "dmesg | tail -n {0}"
+  sys_dmesg_grep:     "dmesg | grep {0}"
+  soc_model:          "cat /proc/device-tree/model"
+  soc_compatible:     "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+
+  # 温度
+  temp_all:           "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
+  temp_cpu:           "cat /sys/class/thermal/thermal_zone0/temp"
+
+  # CPU 调频
+  cpu_freq_cur:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+  cpu_freq_max:       "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+  cpu_governor:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  cpu_set_governor:   "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+  # NXP 专有：NPU（i.MX8M Plus）
+  npu_info:           "lsmod | grep -E 'galcore|imx8m'"
+  npu_devices:        "ls /dev/galcore /dev/vsi_nn*"
+
+  # 视频编解码 VPU/GPU
+  vpu_info:           "dmesg | grep -i vpu"
+  gpu_info:           "dmesg | grep -i -E 'gpu|galcore|etnaviv'"
+
+  # 存储
+  storage_list:       "ls -l /dev/mmcblk* /dev/sd*"
+  emmc_cid:           "cat /sys/class/block/mmcblk0/device/cid"
+  emmc_name:          "cat /sys/class/block/mmcblk0/device/name"
+  flash_partitions:   "cat /proc/mtd"
+
+  # 网络
+  net_ip_addr:        "ip addr"
+  net_ip_route:       "ip route"
+  net_stats:          "cat /proc/net/dev"
+  eth0_mac:           "cat /sys/class/net/eth0/address"
+  wifi_status:        "iw dev wlan0 info"
+  ping_test:          "ping -c 4 {0}"
+
+  # 常见总线（I2C/SPI/CAN）
+  i2c_detect_0:       "i2cdetect -y 0"
+  i2c_detect_bus:     "i2cdetect -y {0}"
+  spi_devices:        "ls /dev/spidev*"
+  can_links:          "ip -details link show type can"
+  can_up:             "ip link set {0} up type can bitrate {1}"
+  can_down:           "ip link set {0} down"
+
+  # 服务管理
+  svc_status:         "systemctl status {0} --no-pager"
+  svc_start:          "systemctl start {0}"
+  svc_stop:           "systemctl stop {0}"
+  svc_restart:        "systemctl restart {0}"
+  svc_list:           "systemctl list-units --type=service --no-pager"
+  svc_failed:         "systemctl list-units --state=failed --no-pager"
+  journal_tail:       "journalctl -n {0} --no-pager"
+  journal_svc:        "journalctl -u {0} -n 50 --no-pager"
+
+  # 进程
+  proc_all:           "ps -ef"
+  proc_grep:          "ps -ef | grep {0} | grep -v grep"
+  proc_top:           "top -bn1 | head -20"

@@ -1,0 +1,71 @@
+# OpenWrt 平台命令模板
+# 适用场景：路由器、网关、边缘盒子（OpenWrt 21/22/23）
+# 典型 SoC：MTK、Qualcomm、Realtek、Broadcom、Amlogic、x86
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # 系统信息
+  owrt_release:       "cat /etc/openwrt_release"
+  owrt_banner:        "cat /etc/banner"
+  sys_uname:          "uname -a"
+  sys_uptime:         "uptime"
+  sys_mem_usage:      "free"
+  sys_disk_usage:     "df -h"
+  sys_dmesg_tail:     "dmesg | tail -n {0}"
+  sys_logread_tail:   "logread | tail -n {0}"
+  sys_logread_grep:   "logread | grep {0}"
+
+  # UCI 配置（OpenWrt 核心）
+  uci_show_all:       "uci show"
+  uci_show_pkg:       "uci show {0}"
+  uci_get:            "uci get {0}"
+  uci_set:            "uci set {0}={1}"
+  uci_commit_pkg:     "uci commit {0}"
+
+  # 网络
+  net_ifstatus:       "ifstatus {0}"
+  net_ip_addr:        "ip addr"
+  net_ip_route:       "ip route"
+  net_bridge:         "brctl show"
+  net_dnsmasq_leases: "cat /tmp/dhcp.leases"
+  net_wifi_status:    "ubus call network.wireless status"
+  net_wifi_reload:    "wifi reload"
+  net_wifi_up:        "wifi up"
+  net_wifi_down:      "wifi down"
+  ping_test:          "ping -c 4 {0}"
+
+  # 防火墙
+  fw_status:          "service firewall status"
+  fw_restart:         "service firewall restart"
+  fw_rules:           "iptables -S"
+  nft_rules:          "nft list ruleset"
+
+  # 进程与服务（procd）
+  svc_list:           "service"
+  svc_status:         "service {0} status"
+  svc_start:          "service {0} start"
+  svc_stop:           "service {0} stop"
+  svc_restart:        "service {0} restart"
+  proc_all:           "ps w"
+  proc_grep:          "ps w | grep {0} | grep -v grep"
+  proc_top:           "top -bn1 | head -20"
+
+  # 包管理
+  opkg_list_installed: "opkg list-installed"
+  opkg_update:        "opkg update"
+  opkg_install:       "opkg install {0}"
+  opkg_remove:        "opkg remove {0}"
+
+  # 存储
+  storage_mount:      "mount"
+  storage_block_info: "block info"
+  storage_devices:    "ls -l /dev/mmcblk* /dev/sd*"
+
+  # 温度（平台差异大，这里给通用路径）
+  temp_all:           "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+
+  # 系统操作
+  sys_reboot:         "reboot"
+  sys_poweroff:       "poweroff"

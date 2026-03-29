@@ -1,0 +1,71 @@
+# Xilinx 平台命令模板
+# 适用平台：Zynq-7000, Zynq UltraScale+ MPSoC, Versal
+# 典型系统：PetaLinux / Yocto / Ubuntu on Zynq
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # 系统基础
+  sys_uname:            "uname -a"
+  sys_uptime:           "uptime"
+  sys_os_release:       "cat /etc/os-release"
+  sys_cpu_info:         "cat /proc/cpuinfo"
+  sys_mem_usage:        "free -m"
+  sys_disk_usage:       "df -h"
+  sys_dmesg_tail:       "dmesg | tail -n {0}"
+  sys_dmesg_grep:       "dmesg | grep {0}"
+  soc_model:            "cat /proc/device-tree/model"
+  soc_compatible:       "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+
+  # 温度与频率
+  temp_all:             "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+  cpu_freq_cur:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+  cpu_governor:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+  # FPGA / PL 专有（Device Tree Overlay + FPGA Manager）
+  fpga_mgr_state:       "cat /sys/class/fpga_manager/fpga0/state"
+  fpga_mgr_flags:       "cat /sys/class/fpga_manager/fpga0/flags"
+  fpga_mgr_name:        "cat /sys/class/fpga_manager/fpga0/name"
+  fpga_load_bitstream:  "cat {0} > /sys/class/fpga_manager/fpga0/firmware"
+  # 读取已注册 overlay
+  fpga_overlays:        "ls /sys/kernel/config/device-tree/overlays"
+
+  # AXI 外设
+  axi_uio_devices:      "ls -l /dev/uio*"
+  axi_i2c_devices:      "i2cdetect -l"
+  axi_spi_devices:      "ls /dev/spidev*"
+
+  # XRT（若是 Alveo/边缘 AI 平台并安装了 XRT）
+  xrt_devices:          "xbutil examine"
+  xrt_topology:         "xbutil examine --report platform"
+
+  # 存储
+  storage_devices:      "ls -l /dev/mmcblk* /dev/sd* /dev/nvme*"
+  mtd_list:             "cat /proc/mtd"
+
+  # 网络
+  net_ip_addr:          "ip addr"
+  net_ip_route:         "ip route"
+  net_stats:            "cat /proc/net/dev"
+  eth0_mac:             "cat /sys/class/net/eth0/address"
+  ping_test:            "ping -c 4 {0}"
+
+  # 服务管理
+  svc_status:           "systemctl status {0} --no-pager"
+  svc_start:            "systemctl start {0}"
+  svc_stop:             "systemctl stop {0}"
+  svc_restart:          "systemctl restart {0}"
+  svc_list:             "systemctl list-units --type=service --no-pager"
+  journal_tail:         "journalctl -n {0} --no-pager"
+  journal_svc:          "journalctl -u {0} -n 50 --no-pager"
+
+  # 进程
+  proc_all:             "ps -ef"
+  proc_grep:            "ps -ef | grep {0} | grep -v grep"
+  proc_top:             "top -bn1 | head -20"
+
+  # PetaLinux 常见调试
+  petalinux_bootargs:   "cat /proc/cmdline"
+  petalinux_modules:    "lsmod"
+  petalinux_dt_nodes:   "find /proc/device-tree -maxdepth 2 -type f | head -n 80"

@@ -1,0 +1,72 @@
+# HiSilicon 平台命令模板
+# 适用芯片：Hi3516/Hi3518/Hi3559/Hi3536/Hi3798 等（安防 IPC/NVR/机顶盒常见）
+# 典型系统：Linux + BusyBox / Buildroot / OpenHarmony 变体
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # 系统基础
+  sys_uname:            "uname -a"
+  sys_uptime:           "uptime"
+  sys_mem_usage:        "free"
+  sys_disk_usage:       "df -h"
+  sys_dmesg_tail:       "dmesg | tail -n {0}"
+  sys_dmesg_grep:       "dmesg | grep {0}"
+  sys_cpu_info:         "cat /proc/cpuinfo"
+  soc_model:            "cat /proc/device-tree/model"
+  soc_compatible:       "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+
+  # 温度与频率
+  temp_all:             "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+  cpu_freq_cur:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+  cpu_governor:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+  # HiSilicon 多媒体（MPP）
+  # 说明：很多板卡固件预装 hi_* 工具，名称因 SDK 版本有差异
+  mpp_modules:          "lsmod | grep -E 'hi_|hisi_'"
+  vi_status:            "cat /proc/umap/vi"
+  vpss_status:          "cat /proc/umap/vpss"
+  venc_status:          "cat /proc/umap/venc"
+  vdec_status:          "cat /proc/umap/vdec"
+  isp_status:           "cat /proc/umap/isp"
+
+  # 硬件身份
+  hw_eth0_mac:          "cat /sys/class/net/eth0/address"
+  hw_eth1_mac:          "cat /sys/class/net/eth1/address"
+  hw_cpu_serial:        "grep Serial /proc/cpuinfo"
+
+  # 存储
+  storage_devices:      "ls -l /dev/mmcblk* /dev/mtd* /dev/sd*"
+  mtd_list:             "cat /proc/mtd"
+  mtd_partitions:       "cat /proc/partitions | grep mtd"
+  emmc_partitions:      "cat /proc/partitions | grep mmcblk"
+
+  # 网络
+  net_ip_addr:          "ip addr"
+  net_ip_route:         "ip route"
+  net_stats:            "cat /proc/net/dev"
+  ping_test:            "ping -c 4 {0}"
+
+  # 进程与服务（BusyBox 场景常无 systemd）
+  proc_all:             "ps"
+  proc_grep:            "ps | grep {0} | grep -v grep"
+  proc_top:             "top -bn1 | head -20"
+
+  # service 命令（若系统支持）
+  svc_status:           "service {0} status"
+  svc_start:            "service {0} start"
+  svc_stop:             "service {0} stop"
+  svc_restart:          "service {0} restart"
+
+  # systemd（若系统支持）
+  sysd_status:          "systemctl status {0} --no-pager"
+  sysd_restart:         "systemctl restart {0}"
+
+  # 日志
+  log_messages_tail:    "tail -n {0} /var/log/messages"
+  log_kernel_tail:      "dmesg | tail -n {0}"
+
+  # 常见安防应用进程（按需替换）
+  app_media_server:     "ps | grep -E 'media|rtsp|onvif' | grep -v grep"
+  app_restart_media:    "killall {0}; sleep 1; {0} &"

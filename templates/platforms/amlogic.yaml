@@ -1,0 +1,137 @@
+# Amlogic SoC 平台命令模板
+# 适用芯片：S905X/D/Y/Z, S922X, S905X3/X4, S928X, C308X, T950D4, A311D 等
+# 典型系统：Android + Linux 双系统、纯 Android、Debian/Ubuntu on Amlogic
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # ─────────────────────────────────────────────────────────
+  # 硬件身份 & 序列号（Amlogic unifykeys 接口）
+  # ─────────────────────────────────────────────────────────
+  # 说明：unifykeys 是 Amlogic 内核驱动，通过 sysfs 读取烧录到 efuse/EEPROM 的硬件信息。
+  # 写入名称后，再读取 read 节点，一次读取一个字段。
+  hw_usid:        "sh -c 'echo usid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_deviceid:    "sh -c 'echo deviceid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_mac_bt:      "sh -c 'echo mac_bt > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_mac_wifi:    "sh -c 'echo mac_wifi > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_mac_eth:     "sh -c 'echo mac_wifi_2 > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_region_code: "sh -c 'echo region_code > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_custom_key:  "sh -c 'echo {0} > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  hw_list_keys:   "cat /sys/class/unifykeys/list"
+
+  # CPU 序列号（通用 ARM 方式）
+  hw_cpu_serial:  "grep Serial /proc/cpuinfo"
+  hw_cpu_info:    "grep -E 'Processor|Hardware|Revision' /proc/cpuinfo"
+
+  # eMMC CID（制造商/型号/序列号，mmcblkN 根据实际调整）
+  hw_emmc_cid:    "cat /sys/class/block/mmcblk2/device/cid"
+  hw_emmc_name:   "cat /sys/class/block/mmcblk2/device/name"
+  hw_emmc_fwrev:  "cat /sys/class/block/mmcblk2/device/fwrev"
+
+  # 以太网 MAC
+  hw_eth0_mac:    "cat /sys/class/net/eth0/address"
+  hw_eth1_mac:    "cat /sys/class/net/eth1/address"
+
+  # ─────────────────────────────────────────────────────────
+  # 系统状态
+  # ─────────────────────────────────────────────────────────
+  sys_uname:      "uname -a"
+  sys_uptime:     "uptime"
+  sys_dmesg_tail: "dmesg | tail -n {0}"
+  sys_dmesg_grep: "dmesg | grep {0}"
+  sys_cpu_info:   "cat /proc/cpuinfo"
+  sys_mem_info:   "cat /proc/meminfo"
+  sys_mem_usage:  "free -m"
+  sys_disk_usage: "df -h"
+  sys_mounts:     "cat /proc/mounts"
+  sys_cmdline:    "cat /proc/cmdline"
+  sys_version:    "cat /proc/version"
+
+  # ─────────────────────────────────────────────────────────
+  # 温度监控
+  # ─────────────────────────────────────────────────────────
+  # Amlogic 通常有多个热区：CPU/DDR/GPU
+  temp_all:       "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
+  temp_cpu:       "cat /sys/class/thermal/thermal_zone0/temp"
+  temp_ddr:       "cat /sys/class/thermal/thermal_zone1/temp"
+  temp_gpu:       "cat /sys/class/thermal/thermal_zone2/temp"
+
+  # ─────────────────────────────────────────────────────────
+  # CPU 频率 & 性能
+  # ─────────────────────────────────────────────────────────
+  cpu_freq_cur:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+  cpu_freq_max:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
+  cpu_freq_min:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+  cpu_governor:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  cpu_set_governor: "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  # 可用调频策略：performance / powersave / ondemand / interactive / userspace
+  cpu_available_governors: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+
+  # ─────────────────────────────────────────────────────────
+  # GPU（Mali）
+  # ─────────────────────────────────────────────────────────
+  gpu_freq_cur:   "cat /sys/class/mpgpu/cur_freq"
+  gpu_freq_max:   "cat /sys/class/mpgpu/max_freq"
+  gpu_utilization: "cat /sys/class/mpgpu/scale_mode"
+  gpu_driver:     "cat /sys/module/mali/version"
+
+  # ─────────────────────────────────────────────────────────
+  # NPU（Neural Processing Unit，S905D3、T950D4、C308X 等含 NPU）
+  # ─────────────────────────────────────────────────────────
+  npu_info:       "cat /sys/class/npu_model/info"
+  npu_freq:       "cat /sys/class/npu_model/clk_rate"
+  npu_utilization: "cat /sys/class/npu_model/status"
+
+  # ─────────────────────────────────────────────────────────
+  # eMMC / 存储
+  # ─────────────────────────────────────────────────────────
+  storage_list:   "ls -l /dev/mmcblk*"
+  emmc_life:      "cat /sys/class/block/mmcblk2/device/life_time"
+  emmc_partitions: "cat /proc/partitions | grep mmcblk"
+  mtd_list:       "cat /proc/mtd"
+
+  # ─────────────────────────────────────────────────────────
+  # 网络
+  # ─────────────────────────────────────────────────────────
+  net_ip_addr:    "ip addr"
+  net_ip_route:   "ip route"
+  net_stats:      "cat /proc/net/dev"
+  wifi_status:    "iw dev wlan0 info"
+  wifi_scan:      "iw dev wlan0 scan | grep SSID"
+  wifi_link:      "iw dev wlan0 link"
+  wifi_station:   "iw dev wlan0 station dump"
+  ping_test:      "ping -c 4 {0}"
+
+  # ─────────────────────────────────────────────────────────
+  # 服务管理（systemd）
+  # ─────────────────────────────────────────────────────────
+  svc_status:     "systemctl status {0} --no-pager"
+  svc_start:      "systemctl start {0}"
+  svc_stop:       "systemctl stop {0}"
+  svc_restart:    "systemctl restart {0}"
+  svc_enable:     "systemctl enable {0}"
+  svc_list:       "systemctl list-units --type=service --no-pager"
+  svc_failed:     "systemctl list-units --state=failed --no-pager"
+  journal_tail:   "journalctl -n {0} --no-pager"
+  journal_svc:    "journalctl -u {0} -n 50 --no-pager"
+  journal_boot:   "journalctl -b --no-pager | tail -n 100"
+
+  # ─────────────────────────────────────────────────────────
+  # 进程
+  # ─────────────────────────────────────────────────────────
+  proc_all:       "ps -ef"
+  proc_grep:      "ps -ef | grep {0} | grep -v grep"
+  proc_top:       "top -bn1 | head -20"
+  proc_mem_top:   "ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head -20"
+
+  # ─────────────────────────────────────────────────────────
+  # 固件 & OTA
+  # ─────────────────────────────────────────────────────────
+  fw_version:     "cat /etc/os-release"
+  fw_build_info:  "cat /etc/build.prop"
+  # 触发本地 OTA 升级包（升级包需已上传至 /tmp/）
+  ota_local_update: "update {0}"
+  # 检查 SoC 型号
+  soc_model:      "cat /sys/class/amlogic_board/board_id"
+  board_type:     "cat /proc/device-tree/amlogic-dt-id"

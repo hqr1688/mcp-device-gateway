@@ -1,0 +1,121 @@
+# Raspberry Pi 平台命令模板
+# 适用型号：Pi Zero/Zero 2, Pi 2/3/4/5, Pi 400, Compute Module 3/4/5
+# 典型系统：Raspberry Pi OS (Bullseye/Bookworm), Ubuntu Server
+#
+# 使用方法：将以下 command_templates 条目复制到你的 devices.yaml 中
+
+command_templates:
+
+  # ─────────────────────────────────────────────────────────
+  # Raspberry Pi 专有工具（vcgencmd / raspi-config）
+  # ─────────────────────────────────────────────────────────
+  # CPU/GPU 温度（vcgencmd 是 VideoCore 固件的专用工具）
+  vc_temp:            "vcgencmd measure_temp"
+  vc_throttle:        "vcgencmd get_throttled"
+  # 解读 throttle 状态码：0x50000 = 曾经过热，0x5 = 当前限速
+  vc_voltage_core:    "vcgencmd measure_volts core"
+  vc_voltage_sdram:   "vcgencmd measure_volts sdram_c"
+  vc_clock_arm:       "vcgencmd measure_clock arm"
+  vc_clock_core:      "vcgencmd measure_clock core"
+  vc_clock_h264:      "vcgencmd measure_clock h264"
+  vc_clock_v3d:       "vcgencmd measure_clock v3d"
+  vc_clock_isp:       "vcgencmd measure_clock isp"
+  vc_mem_arm:         "vcgencmd get_mem arm"
+  vc_mem_gpu:         "vcgencmd get_mem gpu"
+  vc_firmware_ver:    "vcgencmd version"
+  vc_codec_enabled:   "vcgencmd codec_enabled H264"
+  vc_camera_status:   "vcgencmd get_camera"
+  # Pi 5 用 rpi-eeprom-update 查看固件状态
+  eeprom_status:      "rpi-eeprom-update"
+
+  # GPIO（需安装 raspi-gpio；Pi 5 请使用 pinctrl）
+  gpio_get_all:       "raspi-gpio get"
+  gpio_get_pin:       "raspi-gpio get {0}"
+  gpio_set_output:    "raspi-gpio set {0} op"
+  gpio_set_input:     "raspi-gpio set {0} ip"
+  gpio_set_high:      "raspi-gpio set {0} dh"
+  gpio_set_low:       "raspi-gpio set {0} dl"
+  # Pi 5 用 pinctrl 替代
+  pinctrl_get:        "pinctrl get"
+  pinctrl_get_pin:    "pinctrl get {0}"
+
+  # ─────────────────────────────────────────────────────────
+  # 系统信息
+  # ─────────────────────────────────────────────────────────
+  sys_uname:          "uname -a"
+  sys_uptime:         "uptime"
+  sys_hostname:       "hostname -I"
+  sys_disk_usage:     "df -h"
+  sys_mem_usage:      "free -h"
+  sys_cpu_info:       "cat /proc/cpuinfo | grep -E 'Model|Hardware|Revision|Serial'"
+  sys_board_model:    "cat /proc/device-tree/model"
+  sys_os_release:     "cat /etc/os-release"
+  sys_dmesg_tail:     "dmesg | tail -n {0}"
+  sys_dmesg_grep:     "dmesg | grep {0}"
+
+  # ─────────────────────────────────────────────────────────
+  # CPU 频率 & 调速
+  # ─────────────────────────────────────────────────────────
+  cpu_freq_cur:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+  cpu_freq_max:       "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+  cpu_governor:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  cpu_set_governor:   "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+  # ─────────────────────────────────────────────────────────
+  # 存储（SD 卡 / eMMC）
+  # ─────────────────────────────────────────────────────────
+  storage_list:       "ls -l /dev/mmcblk* /dev/sd*"
+  sd_info:            "cat /sys/class/block/mmcblk0/device/name"
+  sd_cid:             "cat /sys/class/block/mmcblk0/device/cid"
+  sd_speed_class:     "cat /sys/class/block/mmcblk0/device/speed_class"
+
+  # ─────────────────────────────────────────────────────────
+  # 网络
+  # ─────────────────────────────────────────────────────────
+  net_ip_addr:        "ip addr"
+  net_ip_route:       "ip route"
+  eth_mac:            "cat /sys/class/net/eth0/address"
+  wifi_status:        "iw dev wlan0 info"
+  wifi_scan:          "iw dev wlan0 scan | grep -E 'SSID|signal'"
+  wifi_link:          "iw dev wlan0 link"
+  wifi_mac:           "cat /sys/class/net/wlan0/address"
+  ping_test:          "ping -c 4 {0}"
+
+  # ─────────────────────────────────────────────────────────
+  # I2C / SPI / UART（常用于传感器接入）
+  # ─────────────────────────────────────────────────────────
+  i2c_detect_1:       "i2cdetect -y 1"
+  i2c_detect_bus:     "i2cdetect -y {0}"
+  i2c_get:            "i2cget -y {0} {1} {2}"
+  i2c_dump:           "i2cdump -y {0} {1}"
+  spi_devices:        "ls /dev/spidev*"
+  uart_devices:       "ls /dev/ttyAMA* /dev/ttyS*"
+
+  # ─────────────────────────────────────────────────────────
+  # 摄像头
+  # ─────────────────────────────────────────────────────────
+  # 传统 MMAL（Pi 4 及更早）
+  camera_list_v4l:    "v4l2-ctl --list-devices"
+  camera_formats:     "v4l2-ctl -d /dev/{0} --list-formats-ext"
+  # Pi 5 / libcamera
+  libcamera_list:     "libcamera-hello --list-cameras"
+
+  # ─────────────────────────────────────────────────────────
+  # 服务管理（systemd）
+  # ─────────────────────────────────────────────────────────
+  svc_status:         "systemctl status {0} --no-pager"
+  svc_start:          "systemctl start {0}"
+  svc_stop:           "systemctl stop {0}"
+  svc_restart:        "systemctl restart {0}"
+  svc_enable:         "systemctl enable {0}"
+  svc_list:           "systemctl list-units --type=service --no-pager"
+  svc_failed:         "systemctl list-units --state=failed --no-pager"
+  journal_tail:       "journalctl -n {0} --no-pager"
+  journal_svc:        "journalctl -u {0} -n 50 --no-pager"
+
+  # ─────────────────────────────────────────────────────────
+  # 进程
+  # ─────────────────────────────────────────────────────────
+  proc_all:           "ps -ef"
+  proc_grep:          "ps -ef | grep {0} | grep -v grep"
+  proc_top:           "top -bn1 | head -20"
