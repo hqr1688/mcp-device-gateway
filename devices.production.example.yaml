@@ -37,6 +37,27 @@ devices:
     host: <DEVICE_IP>
     port: 22
     username: <USERNAME>
+    os_family: "linux"
+    os_name: "Ubuntu"
+    os_version: "22.04"
+    description: "生产主设备，负责线上服务运行与运维动作"
+    when_to_use: "线上健康检查、服务维护、日志回收"
+    capabilities:
+      - "shell-command"
+      - "service-management"
+      - "log-inspection"
+      - "file-transfer"
+    tags:
+      - "prod"
+      - "linux"
+      - "app"
+    preferred_templates:
+      - "linux_common.health_check"
+      - "linux_common.disk_usage"
+      - "linux_common.mem_usage"
+      - "device_specific.devkit-prod.service_status"
+      - "device_specific.devkit-prod.service_restart"
+      - "device_specific.devkit-prod.tail_log"
 
     # 优先使用密钥认证，生产环境禁止使用明文密码
     key_file: C:/keys/devkit_id_ed25519
@@ -58,6 +79,25 @@ devices:
     host: <STAGING_IP>
     port: 22
     username: deploy
+    os_family: "linux"
+    os_name: "Ubuntu"
+    os_version: "22.04"
+    description: "预发设备，用于发布前验证"
+    when_to_use: "发布演练、预发环境问题复现"
+    capabilities:
+      - "shell-command"
+      - "service-management"
+      - "log-inspection"
+      - "file-transfer"
+    tags:
+      - "staging"
+      - "linux"
+      - "app"
+    preferred_templates:
+      - "linux_common.health_check"
+      - "linux_common.disk_usage"
+      - "device_specific.devkit-staging.service_status"
+      - "device_specific.devkit-staging.tail_log"
     key_file: C:/keys/staging_id_ed25519
     password: null
     known_hosts: C:/keys/known_hosts
@@ -78,24 +118,60 @@ devices:
 # =============================================================================
 
 command_templates:
+  windows_common:
+    # 生产环境一般为 Linux，此处保留 Windows 通用模板以兼容混合环境。
+    list_dir:
+      template: "powershell -Command Get-ChildItem -Force {0}"
+      description: "列出目录内容（Windows）"
+      when_to_use: "目标是 Windows 主机时查看目录"
+      args: ["path"]
+      examples:
+        - ["C:/"]
+      risk: "low"
 
-  # --- 健康检查 ---
-  health_check: "uname -a; uptime"
-  disk_usage:   "df -h"
-  mem_usage:    "free -m"
+  linux_common:
+    # --- 健康检查 ---
+    health_check: "uname -a; uptime"
+    disk_usage: "df -h"
+    mem_usage: "free -m"
 
-  # --- 服务管理（按需开放，最小化授权）---
-  # 调用示例：cmd_exec(device_name="devkit-prod", command_key="service_status", args=["app"])
-  service_status:  "systemctl status {0} --no-pager"
-  service_restart: "systemctl restart {0}"
-  service_stop:    "systemctl stop {0}"
+    # --- 通用目录与进程 ---
+    list_dir:
+      template: "ls -al {0}"
+      description: "列出指定目录"
+      when_to_use: "检查目录结构或文件存在性"
+      args: ["path"]
+      examples:
+        - ["/opt/app/"]
+        - ["/var/log/app/"]
+      risk: "low"
+    app_process:
+      template: "ps -ef | grep {0} | grep -v grep"
+      description: "查看指定进程"
+      when_to_use: "检查服务进程是否存在"
+      args: ["process_keyword"]
+      examples:
+        - ["myapp"]
+      risk: "low"
 
-  # --- 日志查看 ---
-  # 调用示例：cmd_exec(command_key="tail_log", args=["100"])
-  tail_log:     "tail -n {0} /var/log/app/app.log"
-  list_log_dir: "ls -al /var/log/app/"
+  device_specific:
+    devkit-prod:
+      # --- 服务管理（按需开放，最小化授权）---
+      service_status: "systemctl status {0} --no-pager"
+      service_restart: "systemctl restart {0}"
+      service_stop: "systemctl stop {0}"
 
-  # --- 应用目录与进程 ---
-  list_app_dir: "ls -al /opt/app/"
-  # 调用示例：cmd_exec(command_key="app_process", args=["myapp"])
-  app_process:  "ps -ef | grep {0} | grep -v grep"
+      # --- 日志查看 ---
+      tail_log: "tail -n {0} /var/log/app/app.log"
+      list_log_dir: "ls -al /var/log/app/"
+
+      # --- 应用目录 ---
+      list_app_dir: "ls -al /opt/app/"
+
+    devkit-staging:
+      service_status: "systemctl status {0} --no-pager"
+      service_restart: "systemctl restart {0}"
+      service_stop: "systemctl stop {0}"
+      tail_log: "tail -n {0} /var/log/app/app.log"
+      list_log_dir: "ls -al /var/log/app/"
+      list_app_dir: "ls -al /opt/app/"

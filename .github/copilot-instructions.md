@@ -7,10 +7,12 @@
 ## 文档语言规范
 
 **本项目所有文档均使用中文**，包括：
+
 - Markdown 文档（README、CHANGELOG、设计文档等）
 - 代码注释与 docstring
 - 提交信息（commit message）
 - 配置文件中的说明性注释
+- 所有语言都使用中文
 
 ## 构建与运行
 
@@ -29,11 +31,12 @@ python -m mcp_device_gateway.server
 ```
 
 **环境变量**（均为可选，覆盖默认值）：
-| 变量 | 默认值 | 用途 |
-|---|---|---|
-| `MCP_DEVICE_CONFIG` | `./devices.example.yaml` | 设备配置文件路径 |
-| `MCP_AUDIT_LOG` | `./mcp_audit.log` | 审计日志路径（JSONL 格式） |
-| `MCP_TRANSPORT` | `stdio` | MCP 传输层 |
+
+| 变量                  | 默认值                     | 用途                       |
+| --------------------- | -------------------------- | -------------------------- |
+| `MCP_DEVICE_CONFIG` | `./devices.example.yaml` | 设备配置文件路径           |
+| `MCP_AUDIT_LOG`     | `./mcp_audit.log`        | 审计日志路径（JSONL 格式） |
+| `MCP_TRANSPORT`     | `stdio`                  | MCP 传输层                 |
 
 ## 架构
 
@@ -70,6 +73,7 @@ server.py          ← FastMCP 入口；定义 5 个工具；写入 JSONL 审计
 ## 配置文件格式
 
 规范参考见 [devices.example.yaml](../devices.example.yaml)，关键规则：
+
 - 每个设备必须有 `host` 和 `username`
 - `allowed_roots: []` 表示**不限制路径**（代码中依赖此行为时须明确注释）
 - 命令模板参数使用 `.format()` 位置语法：`{0}`、`{1}`

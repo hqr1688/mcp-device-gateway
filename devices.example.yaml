@@ -3,6 +3,26 @@ devices:
     host: 192.168.200.218
     port: 22
     username: root
+    os_family: "linux"
+    os_name: "Ubuntu"
+    os_version: "22.04"
+    description: "开发验证板卡，用于常规构建验证和日志排障"
+    when_to_use: "日常开发联调、进程状态排查、目录与日志检查"
+    capabilities:
+      - "shell-command"
+      - "service-management"
+      - "log-inspection"
+      - "file-transfer"
+    tags:
+      - "dev"
+      - "arm64"
+      - "idm"
+    preferred_templates:
+      - "linux_common.health_check"
+      - "device_specific.devkit-01.idm_status"
+      - "device_specific.devkit-01.list_idm_dir"
+      - "device_specific.devkit-01.idm_log_list"
+      - "device_specific.devkit-01.run_make"
     password: "123456"
     key_file: null
     known_hosts: null
@@ -10,29 +30,61 @@ devices:
       - /
 
 command_templates:
-  health_check: "uname -a; uptime"
-  restart_idm: "systemctl restart idm"
-  idm_status: "systemctl status idm --no-pager"
-  run_idm: "cd /opt/idm && ./displacementMeter.c308x"
-  list_idm_dir: "ls -al /opt/idm"
-  list_tmp_dir: "ls -al /tmp"
-  list_dir: "ls -al {0}"
-  read_file: "cat {0}"
-  idm_log_list: "ls -al /opt/idm/log"
-  idm_process: "ps -ef | grep displacementMeter.c308x | grep -v grep"
-  disk_usage: "df -h"
-  mem_usage: "free -m"
+  windows_common:
+    list_dir:
+      template: "powershell -Command Get-ChildItem -Force {0}"
+      description: "列出目录内容（Windows）"
+      when_to_use: "目标设备是 Windows 时查看目录"
+      args: ["path"]
+      examples:
+        - ["C:/"]
+      risk: "low"
+    disk_usage:
+      template: "powershell -Command Get-PSDrive -PSProvider FileSystem"
+      description: "查看磁盘使用情况（Windows）"
+      when_to_use: "排查磁盘空间"
+      risk: "low"
 
-# cmd.exec 的 args 会按正则校验：^[a-zA-Z0-9_./:=+-]+$
-# 模板可通过 {0}、{1}... 引用参数
-  run_make: "cd /opt/idm && make {0}"
+  linux_common:
+    health_check:
+      template: "uname -a; uptime"
+      description: "查看内核与运行时长"
+      when_to_use: "连接后快速确认设备状态"
+      examples: []
+      risk: "low"
+    list_tmp_dir: "ls -al /tmp"
+    list_dir:
+      template: "ls -al {0}"
+      description: "列出指定目录"
+      when_to_use: "需要检查某个目录内容时"
+      args: ["path"]
+      examples:
+        - ["/opt/idm"]
+        - ["/tmp"]
+      risk: "low"
+    read_file: "cat {0}"
+    disk_usage: "df -h"
+    mem_usage: "free -m"
 
-# Amlogic unifykeys 读取（usid/deviceid 是设备唯一ID，mac_bt/mac_wifi 是无线MAC）
-  hw_cpu_serial: "grep Serial /proc/cpuinfo"
-  hw_emmc_cid: "cat /sys/class/block/mmcblk2/device/cid"
-  hw_eth0_mac: "cat /sys/class/net/eth0/address"
-  hw_usid: "sh -c 'echo usid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_deviceid: "sh -c 'echo deviceid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_mac_bt: "sh -c 'echo mac_bt > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_mac_wifi: "sh -c 'echo mac_wifi > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_region_code: "sh -c 'echo region_code > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+  device_specific:
+    devkit-01:
+      restart_idm: "systemctl restart idm"
+      idm_status: "systemctl status idm --no-pager"
+      run_idm: "cd /opt/idm && ./displacementMeter.c308x"
+      list_idm_dir: "ls -al /opt/idm"
+      idm_log_list: "ls -al /opt/idm/log"
+      idm_process: "ps -ef | grep displacementMeter.c308x | grep -v grep"
+
+      # cmd.exec 的 args 会按正则校验：^[a-zA-Z0-9_./:=+-]+$
+      # 模板可通过 {0}、{1}... 引用参数
+      run_make: "cd /opt/idm && make {0}"
+
+      # Amlogic unifykeys 读取（usid/deviceid 是设备唯一ID，mac_bt/mac_wifi 是无线MAC）
+      hw_cpu_serial: "grep Serial /proc/cpuinfo"
+      hw_emmc_cid: "cat /sys/class/block/mmcblk2/device/cid"
+      hw_eth0_mac: "cat /sys/class/net/eth0/address"
+      hw_usid: "sh -c 'echo usid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      hw_deviceid: "sh -c 'echo deviceid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      hw_mac_bt: "sh -c 'echo mac_bt > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      hw_mac_wifi: "sh -c 'echo mac_wifi > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      hw_region_code: "sh -c 'echo region_code > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"

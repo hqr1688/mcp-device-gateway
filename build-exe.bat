@@ -8,16 +8,17 @@
 ::
 ::  Options:
 ::    --python  <exe>    Python executable (default: auto-detect .venv)
-::    --onefile          Bundle into a single .exe (default: one-dir)
+::    --onefile          Bundle into a single .exe (default)
+::    --onedir           Bundle as exe + _internal directory
 ::    --clean            Remove build\ and dist\ before building
 ::
 ::  Output:
-::    One-dir (default): dist\mcp-device-gateway\mcp-device-gateway.exe
-::    One-file         : dist\mcp-device-gateway.exe
+::    One-file (default): dist\mcp-device-gateway.exe
+::    One-dir          : dist\mcp-device-gateway\mcp-device-gateway.exe
 ::
-::  Note: --onefile is portable but has ~2-3s slower startup because
-::  it self-extracts to %TEMP% on each launch. For an MCP stdio
-::  server invoked by Copilot Chat, one-dir (default) is preferred.
+::  Note: --onefile is truly single-file portable; startup is usually
+::  ~2-3s slower because it self-extracts to %TEMP% on each launch.
+::  Use --onedir if you prioritize startup speed.
 :: ================================================================
 setlocal enabledelayedexpansion
 
@@ -25,7 +26,7 @@ cd /d "%~dp0"
 
 :: ── defaults ────────────────────────────────────────────────────
 set "PYTHON_EXE=python"
-set "ONEFILE=0"
+set "ONEFILE=1"
 set "DO_CLEAN=0"
 
 :: ── parse args ──────────────────────────────────────────────────
@@ -33,6 +34,7 @@ set "DO_CLEAN=0"
 if "%~1"=="" goto :done_args
 if /i "%~1"=="--python"   ( set "PYTHON_EXE=%~2" & shift & shift & goto :parse_args )
 if /i "%~1"=="--onefile"  ( set "ONEFILE=1"      & shift & goto :parse_args )
+if /i "%~1"=="--onedir"   ( set "ONEFILE=0"      & shift & goto :parse_args )
 if /i "%~1"=="--clean"    ( set "DO_CLEAN=1"     & shift & goto :parse_args )
 echo [WARN] Unknown argument: %~1
 shift & goto :parse_args
@@ -134,9 +136,10 @@ echo.
 echo =^> Build complete
 if "!ONEFILE!"=="1" (
     echo   Output: dist\mcp-device-gateway.exe
+    echo   This file can run on target machines without a Python installation.
 ) else (
     echo   Output: dist\mcp-device-gateway\mcp-device-gateway.exe
-    echo   To distribute, copy the entire dist\mcp-device-gateway\ folder.
+    echo   IMPORTANT: do not copy only exe; distribute the entire folder including _internal\.
 )
 
 :: ── usage hint ──────────────────────────────────────────────────

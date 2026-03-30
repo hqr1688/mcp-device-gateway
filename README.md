@@ -14,8 +14,9 @@
 - [devices.example.yaml](devices.example.yaml) —— 开发环境配置示例
 - [devices.production.example.yaml](devices.production.example.yaml) —— 生产环境最小授权配置模板（含 SSH 密钥与 known_hosts 配置步骤）
 - [PLAYBOOK.md](PLAYBOOK.md) —— Copilot Chat 实战操作手册（按任务场景提供可复用工具调用剧本）
+- [MCP_CAPABILITIES.md](MCP_CAPABILITIES.md) —— MCP 能力总览（工具用途、工作流、错误码、模板规范）
 - [start-mcp-device-gateway.bat](start-mcp-device-gateway.bat) —— Windows 一键启动脚本
-- [build-exe.bat](build-exe.bat) —— 构建脱离 Python 环境的独立 exe
+- [build-exe.bat](build-exe.bat) —— 构建脱离 Python 环境的独立 exe（默认单文件）
 - [release.bat](release.bat) —— 打包发布到 PyPI
 
 ## 1. 项目定位
@@ -137,7 +138,13 @@ flowchart LR
 
 检测目标设备 SSH 连通性。
 
-### 5.3 cmd_exec
+### 5.3 device_profile_get
+
+返回单个设备画像信息（description、when_to_use、capabilities、tags、preferred_templates）。
+
+推荐：当存在多个设备时，先用该工具确定最合适的目标设备。
+
+### 5.4 cmd_exec
 
 按 command_key 执行命令模板。
 
@@ -148,11 +155,31 @@ flowchart LR
 - args: 可选参数数组
 - timeout_sec: 超时秒数，默认 30
 
-### 5.4 file_upload
+### 5.5 command_template_list
+
+返回全部命令模板及用途信息（description、when_to_use、args、risk）。
+
+推荐：Agent 在首次执行 cmd_exec 前先调用此工具发现可用 command_key。
+
+### 5.6 command_template_get
+
+返回单个 command_key 的详细信息（参数个数、用途、风险级别）。
+
+### 5.7 capability_overview
+
+返回服务能力地图与推荐调用顺序，便于 Agent 进行工具选择。
+
+### 5.8 task_recommend
+
+输入自然语言任务，返回推荐工具、推荐 command_key 与参数草案。
+
+推荐：当你只知道“想做什么”但不确定工具调用细节时，先调用此工具。
+
+### 5.9 file_upload
 
 上传本地文件到远端路径（受 allowed_roots 约束）。
 
-### 5.5 file_download
+### 5.10 file_download
 
 下载远端文件到本地路径（受 allowed_roots 约束）。
 
@@ -218,7 +245,7 @@ python -m mcp_device_gateway.server
 方式三（独立 exe，无需 Python，见第 8 节）：
 
 ```bat
-dist\mcp-device-gateway\mcp-device-gateway.exe
+dist\mcp-device-gateway.exe
 ```
 
 ## 7. 在 Copilot Chat 中接入
@@ -250,7 +277,7 @@ dist\mcp-device-gateway\mcp-device-gateway.exe
   "servers": {
     "embedded-device-gateway": {
       "type": "stdio",
-      "command": "D:\\prj\\mcp-device-gateway\\dist\\mcp-device-gateway\\mcp-device-gateway.exe",
+      "command": "D:\\prj\\mcp-device-gateway\\dist\\mcp-device-gateway.exe",
       "env": {
         "MCP_DEVICE_CONFIG": "D:\\prj\\mcp-device-gateway\\devices.example.yaml",
         "MCP_AUDIT_LOG":     "D:\\prj\\mcp-device-gateway\\mcp_audit.log"
@@ -267,25 +294,26 @@ dist\mcp-device-gateway\mcp-device-gateway.exe
 
 ## 8. 独立 exe 构建
 
-使用 PyInstaller 将服务打包为单目录 exe，分发时无需目标机器安装 Python。
+使用 PyInstaller 将服务打包为独立 exe，分发时无需目标机器安装 Python。
 
 ```bat
-:: 首次构建（或依赖变更后）
+:: 首次构建（或依赖变更后，默认单文件 onefile）
 build-exe.bat --clean
 
 :: 增量构建（代码修改后，速度更快）
 build-exe.bat
 
-:: 打包为单个可执行文件（启动稍慢，便于单文件分发）
-build-exe.bat --onefile
+:: 如需目录模式（启动更快，但必须连同 _internal 一起分发）
+build-exe.bat --onedir
 ```
 
 产物位置：
 
 ```text
-dist\mcp-device-gateway\
-  mcp-device-gateway.exe   ← 主执行文件
-  _internal\               ← 依赖库（随整个文件夹一起分发）
+dist\mcp-device-gateway.exe            ← 默认产物（单文件分发）
+dist\mcp-device-gateway\              ← --onedir 时产物目录
+  mcp-device-gateway.exe
+  _internal\                           ← 目录模式必须一起分发
 ```
 
 > **注意**：重新构建前若 exe 正在运行，脚本会自动 `taskkill` 终止它，以避免文件锁导致的 `PermissionError`。
@@ -307,6 +335,14 @@ dist\mcp-device-gateway\
 - MCP_DEVICE_CONFIG: 配置文件路径，默认 ./devices.example.yaml
 - MCP_AUDIT_LOG: 审计日志路径，默认 ./mcp_audit.log
 - MCP_TRANSPORT: MCP 传输层，默认 stdio
+- MCP_CONFIG_POLL_INTERVAL_SEC: 配置监测轮询间隔（秒），默认 2
+
+### 9.3 配置文件不可用时的行为
+
+- 服务进程不会退出。
+- 若配置文件不存在，将自动生成一个模板文件（devices 为空，需用户补齐）。
+- 在配置不可用期间，所有业务工具调用会被拒绝，并返回配置不可用提示。
+- 后台监测线程会持续轮询配置文件；一旦配置变为可用会自动重载并输出恢复日志。
 
 ### 9.2 devices 配置项
 
@@ -315,6 +351,79 @@ dist\mcp-device-gateway\
 - key_file/password 二选一或并存（由 SSH 客户端协商）
 - known_hosts 建议配置，提升主机身份校验安全性
 - allowed_roots 建议最小授权
+- description：设备用途说明（建议填写）
+- when_to_use：推荐使用场景（建议填写）
+- capabilities：设备能力标签列表（如 shell-command、file-transfer）
+- tags：设备分类标签（如 dev、prod、arm64）
+- preferred_templates：该设备优先使用的命令模板 key 列表
+- os_family：系统家族（linux/windows，默认 linux）
+- os_name：系统名称（如 Ubuntu、Windows Server）
+- os_version：系统版本（如 22.04、2019）
+
+### 9.4 command_templates 增强格式（兼容旧格式）
+
+`command_templates` 支持两种写法：
+
+1. 旧格式（字符串，继续支持）
+
+```yaml
+command_templates:
+  health_check: "uname -a; uptime"
+```
+
+2. 增强格式（推荐，便于 Agent 感知）
+
+```yaml
+command_templates:
+  list_dir:
+    template: "ls -al {0}"
+    description: "列出指定目录内容"
+    when_to_use: "需要查看目录下文件时"
+    args: ["path"]
+    examples:
+      - ["/opt/idm"]
+      - ["/tmp"]
+    risk: "low"
+```
+
+`risk` 取值：`low`、`medium`、`high`。
+`examples` 为参数示例数组，用于帮助 Agent 生成 `cmd_exec.args` 草案。
+
+### 9.5 command_templates 分类结构（推荐）
+
+推荐按以下三类组织模板：
+
+1. `windows_common`：Windows 通用模板
+2. `linux_common`：Linux 通用模板
+3. `device_specific`：设备独有模板（按设备名分组）
+
+注意：分类结构与旧版平铺结构不能混用，必须二选一。
+
+示例：
+
+```yaml
+command_templates:
+  windows_common:
+    list_dir: "powershell -Command Get-ChildItem -Force {0}"
+  linux_common:
+    list_dir: "ls -al {0}"
+  device_specific:
+    devkit-01:
+      idm_status: "systemctl status idm --no-pager"
+```
+
+当使用分类结构时，`cmd_exec.command_key` 使用完整 key：
+
+- `windows_common.<template_key>`
+- `linux_common.<template_key>`
+- `device_specific.<device_name>.<template_key>`
+
+例如：`linux_common.list_dir`、`device_specific.devkit-01.idm_status`。
+
+执行时采用强约束：
+- `windows_common.*` 仅允许在 `os_family=windows` 设备执行
+- `linux_common.*` 仅允许在 `os_family=linux` 设备执行
+- 未设置 `os_family` 时按 `linux` 处理
 
 ## 11. 开发与扩展
 
@@ -364,7 +473,7 @@ release.bat --test-pypi
 
 ### 12.4 build-exe.bat 报 PermissionError
 
-`dist\mcp-device-gateway\mcp-device-gateway.exe` 正在运行时会锁住目录内文件。
+`dist\mcp-device-gateway.exe`（或 `dist\mcp-device-gateway\mcp-device-gateway.exe`）正在运行时会锁住输出文件。
 脚本会自动尝试 `taskkill`；若仍失败，请手动关闭进程后重试。
 
 ## 13. 许可证
