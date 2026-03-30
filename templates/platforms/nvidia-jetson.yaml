@@ -6,227 +6,1087 @@
 
 command_templates:
 
-  # ─────────────────────────────────────────────────────────
-  # Jetson 专有工具
-  # ─────────────────────────────────────────────────────────
-  # tegrastats：一次性采样 Jetson 系统状态（无需持续运行）
-  # 输出示例：RAM 1024/7766MB ... CPU [45%@1190,15%@1190,...] TEMP cpu@45.5C gpu@42C
-  tegrastats_once:    "tegrastats --interval 1000 --stop"
-  tegrastats_5s:      "timeout 5 tegrastats --interval 1000"
-  tegrastats_10s:     "timeout 10 tegrastats --interval 1000"
+  linux_common:
 
-  # nvpmodel：功耗模式管理（0=MAXN 最大性能, 1=5W 低功耗, etc.）
-  power_mode_query:   "nvpmodel -q"
-  power_mode_verbose: "nvpmodel -q --verbose"
-  power_mode_set:     "nvpmodel -m {0}"
-  power_mode_list:    "nvpmodel -h"
-  # 常用模式 ID（因型号不同而异，请参考官方文档）：
-  # AGX Orin: 0=MAXN, 1=10W, 2=15W, 3=25W, 4=30W, 5=40W, 6=50W
-  # Xavier NX 常见：0=15W_6CORE, 1=10W_6CORE, 2=10W_4CORE
+    # ─────────────────────────────────────────────────────────
+    # Jetson 专有工具
+    # ─────────────────────────────────────────────────────────
+    # tegrastats：一次性采样 Jetson 系统状态（无需持续运行）
+    # 输出示例：RAM 1024/7766MB ... CPU [45%@1190,15%@1190,...] TEMP cpu@45.5C gpu@42C
+    tegrastats_once:
+      template: "tegrastats --interval 1000 --stop"
+      description: "tegrastats_once 命令"
+      when_to_use: "按需执行 tegrastats_once 场景"
+      args: []
+      examples: []
+      risk: "low"
+    tegrastats_5s:
+      template: "timeout 5 tegrastats --interval 1000"
+      description: "tegrastats_5s 命令"
+      when_to_use: "按需执行 tegrastats_5s 场景"
+      args: []
+      examples: []
+      risk: "low"
+    tegrastats_10s:
+      template: "timeout 10 tegrastats --interval 1000"
+      description: "tegrastats_10s 命令"
+      when_to_use: "按需执行 tegrastats_10s 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # jetson_clocks：锁定到最大频率（用于性能基准测试）
-  clocks_show:        "jetson_clocks --show"
-  clocks_max:         "jetson_clocks"
-  clocks_restore:     "jetson_clocks --restore"
-  # 锁频持续模式（seconds 为持续秒数）
-  clocks_max_for_sec: "timeout {0} jetson_clocks"
-  # 仅锁定 EMC（内存控制器）频率
-  emc_lock_max:       "echo 1 > /sys/kernel/nvpmodel_emc_cap/emc_iso_cap 2>/dev/null"
-  emc_cap_show:       "cat /sys/kernel/nvpmodel_emc_cap/emc_iso_cap 2>/dev/null"
+    # nvpmodel：功耗模式管理（0=MAXN 最大性能, 1=5W 低功耗, etc.）
+    power_mode_query:
+      template: "nvpmodel -q"
+      description: "power_mode_query 命令"
+      when_to_use: "按需执行 power_mode_query 场景"
+      args: []
+      examples: []
+      risk: "low"
+    power_mode_verbose:
+      template: "nvpmodel -q --verbose"
+      description: "power_mode_verbose 命令"
+      when_to_use: "按需执行 power_mode_verbose 场景"
+      args: []
+      examples: []
+      risk: "low"
+    power_mode_set:
+      template: "nvpmodel -m {0}"
+      description: "power_mode_set 命令"
+      when_to_use: "按需执行 power_mode_set 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    power_mode_list:
+      template: "nvpmodel -h"
+      description: "power_mode_list 命令"
+      when_to_use: "按需执行 power_mode_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # 常用模式 ID（因型号不同而异，请参考官方文档）：
+    # AGX Orin: 0=MAXN, 1=10W, 2=15W, 3=25W, 4=30W, 5=40W, 6=50W
+    # Xavier NX 常见：0=15W_6CORE, 1=10W_6CORE, 2=10W_4CORE
 
-  # Jetson 型号与 L4T 版本
-  jetson_model:       "cat /proc/device-tree/model"
-  l4t_version:        "cat /etc/nv_tegra_release"
-  jetpack_version:    "dpkg -l nvidia-jetpack 2>/dev/null | tail -1"
-  l4t_packages:       "dpkg -l | grep nvidia-l4t"
-  board_ids:          "cat /proc/device-tree/chosen/plugin-manager/ids 2>/dev/null"
-  kernel_abi:         "uname -r"
-  boot_slot:          "nvbootctrl get-current-slot 2>/dev/null"
-  boot_slot_info:     "nvbootctrl dump-slots-info 2>/dev/null"
-  secureboot_status:  "cat /sys/firmware/tegra_fuse/odm_production_mode 2>/dev/null"
+    # jetson_clocks：锁定到最大频率（用于性能基准测试）
+    clocks_show:
+      template: "jetson_clocks --show"
+      description: "clocks_show 命令"
+      when_to_use: "按需执行 clocks_show 场景"
+      args: []
+      examples: []
+      risk: "low"
+    clocks_max:
+      template: "jetson_clocks"
+      description: "clocks_max 命令"
+      when_to_use: "按需执行 clocks_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    clocks_restore:
+      template: "jetson_clocks --restore"
+      description: "clocks_restore 命令"
+      when_to_use: "按需执行 clocks_restore 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # 锁频持续模式（seconds 为持续秒数）
+    clocks_max_for_sec:
+      template: "timeout {0} jetson_clocks"
+      description: "clocks_max_for_sec 命令"
+      when_to_use: "按需执行 clocks_max_for_sec 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    # 仅锁定 EMC（内存控制器）频率
+    emc_lock_max:
+      template: "echo 1 > /sys/kernel/nvpmodel_emc_cap/emc_iso_cap 2>/dev/null"
+      description: "emc_lock_max 命令"
+      when_to_use: "按需执行 emc_lock_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emc_cap_show:
+      template: "cat /sys/kernel/nvpmodel_emc_cap/emc_iso_cap 2>/dev/null"
+      description: "emc_cap_show 命令"
+      when_to_use: "按需执行 emc_cap_show 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 温度监控（Jetson 多个热区）
-  # ─────────────────────────────────────────────────────────
-  temp_all:           "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
-  temp_cpu:           "cat /sys/class/thermal/thermal_zone0/temp"
-  temp_gpu:           "cat /sys/class/thermal/thermal_zone1/temp"
-  # SOC/Board 温度（Zone 编号因型号不同）
-  temp_soc:           "cat /sys/class/thermal/thermal_zone2/temp"
-  temp_gpu_tegrastats: "tegrastats --interval 1000 --stop | grep -o 'gpu@[0-9.]*C'"
-  temp_cpu_trip_points: "for z in /sys/class/thermal/thermal_zone*; do [ -f $z/trip_point_0_temp ] && echo $z:$(cat $z/trip_point_0_temp); done"
+    # Jetson 型号与 L4T 版本
+    jetson_model:
+      template: "cat /proc/device-tree/model"
+      description: "jetson_model 命令"
+      when_to_use: "按需执行 jetson_model 场景"
+      args: []
+      examples: []
+      risk: "low"
+    l4t_version:
+      template: "cat /etc/nv_tegra_release"
+      description: "l4t_version 命令"
+      when_to_use: "按需执行 l4t_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    jetpack_version:
+      template: "dpkg -l nvidia-jetpack 2>/dev/null | tail -1"
+      description: "jetpack_version 命令"
+      when_to_use: "按需执行 jetpack_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    l4t_packages:
+      template: "dpkg -l | grep nvidia-l4t"
+      description: "l4t_packages 命令"
+      when_to_use: "按需执行 l4t_packages 场景"
+      args: []
+      examples: []
+      risk: "low"
+    board_ids:
+      template: "cat /proc/device-tree/chosen/plugin-manager/ids 2>/dev/null"
+      description: "board_ids 命令"
+      when_to_use: "按需执行 board_ids 场景"
+      args: []
+      examples: []
+      risk: "low"
+    kernel_abi:
+      template: "uname -r"
+      description: "kernel_abi 命令"
+      when_to_use: "按需执行 kernel_abi 场景"
+      args: []
+      examples: []
+      risk: "low"
+    boot_slot:
+      template: "nvbootctrl get-current-slot 2>/dev/null"
+      description: "boot_slot 命令"
+      when_to_use: "按需执行 boot_slot 场景"
+      args: []
+      examples: []
+      risk: "low"
+    boot_slot_info:
+      template: "nvbootctrl dump-slots-info 2>/dev/null"
+      description: "boot_slot_info 命令"
+      when_to_use: "按需执行 boot_slot_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    secureboot_status:
+      template: "cat /sys/firmware/tegra_fuse/odm_production_mode 2>/dev/null"
+      description: "secureboot_status 命令"
+      when_to_use: "按需执行 secureboot_status 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # CPU 频率（多核，ARM Cortex）
-  # ─────────────────────────────────────────────────────────
-  cpu_freq_cur:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
-  cpu_freq_max:       "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
-  cpu_governor:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  cpu_set_governor:   "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  cpu_available_governors: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
-  cpu_online:         "cat /sys/devices/system/cpu/online"
-  cpu_idle_states:    "for c in /sys/devices/system/cpu/cpu*/cpuidle/state*; do [ -d $c ] && echo $c:$(cat $c/name 2>/dev/null):$(cat $c/disable 2>/dev/null); done"
-  cpu_hotplug_offline: "echo 0 > /sys/devices/system/cpu/cpu{0}/online"
-  cpu_hotplug_online:  "echo 1 > /sys/devices/system/cpu/cpu{0}/online"
+    # ─────────────────────────────────────────────────────────
+    # 温度监控（Jetson 多个热区）
+    # ─────────────────────────────────────────────────────────
+    temp_all:
+      template: "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
+      description: "temp_all 命令"
+      when_to_use: "按需执行 temp_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_cpu:
+      template: "cat /sys/class/thermal/thermal_zone0/temp"
+      description: "temp_cpu 命令"
+      when_to_use: "按需执行 temp_cpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_gpu:
+      template: "cat /sys/class/thermal/thermal_zone1/temp"
+      description: "temp_gpu 命令"
+      when_to_use: "按需执行 temp_gpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # SOC/Board 温度（Zone 编号因型号不同）
+    temp_soc:
+      template: "cat /sys/class/thermal/thermal_zone2/temp"
+      description: "temp_soc 命令"
+      when_to_use: "按需执行 temp_soc 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_gpu_tegrastats:
+      template: "tegrastats --interval 1000 --stop | grep -o 'gpu@[0-9.]*C'"
+      description: "temp_gpu_tegrastats 命令"
+      when_to_use: "按需执行 temp_gpu_tegrastats 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_cpu_trip_points:
+      template: "for z in /sys/class/thermal/thermal_zone*; do [ -f $z/trip_point_0_temp ] && echo $z:$(cat $z/trip_point_0_temp); done"
+      description: "temp_cpu_trip_points 命令"
+      when_to_use: "按需执行 temp_cpu_trip_points 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # GPU（NVIDIA Ampere / Volta / Maxwell）
-  # ─────────────────────────────────────────────────────────
-  gpu_freq_cur:       "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/cur_freq"
-  gpu_freq_max:       "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/max_freq"
-  gpu_governor:       "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/governor"
-  gpu_set_max_freq:   "echo {0} > /sys/devices/17000000.gpu/devfreq/17000000.gpu/max_freq"
-  gpu_railgate_enable: "echo 1 > /sys/devices/17000000.gpu/railgate_enable"
-  gpu_railgate_disable: "echo 0 > /sys/devices/17000000.gpu/railgate_enable"
-  gpu_load:           "cat /sys/devices/17000000.gpu/load"
-  gpu_busy_time:      "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/stats/total_trans"
-  # CUDA 版本
-  cuda_version:       "nvcc --version"
-  cudnn_version:      "cat /usr/include/cudnn_version.h | grep -E 'CUDNN_MAJOR|CUDNN_MINOR|CUDNN_PATCHLEVEL'"
-  cuda_visible_devices: "echo $CUDA_VISIBLE_DEVICES"
-  cuda_samples_ls:    "ls /usr/local/cuda/samples"
-  cuda_sample_devicequery: "/usr/local/cuda/samples/1_Utilities/deviceQuery/deviceQuery"
-  cuda_smi_like:      "cat /sys/kernel/debug/gpu_stats 2>/dev/null"
+    # ─────────────────────────────────────────────────────────
+    # CPU 频率（多核，ARM Cortex）
+    # ─────────────────────────────────────────────────────────
+    cpu_freq_cur:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+      description: "cpu_freq_cur 命令"
+      when_to_use: "按需执行 cpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_freq_max:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+      description: "cpu_freq_max 命令"
+      when_to_use: "按需执行 cpu_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_governor:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_governor 命令"
+      when_to_use: "按需执行 cpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_set_governor:
+      template: "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_set_governor 命令"
+      when_to_use: "按需执行 cpu_set_governor 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    cpu_available_governors:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+      description: "cpu_available_governors 命令"
+      when_to_use: "按需执行 cpu_available_governors 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_online:
+      template: "cat /sys/devices/system/cpu/online"
+      description: "cpu_online 命令"
+      when_to_use: "按需执行 cpu_online 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_idle_states:
+      template: "for c in /sys/devices/system/cpu/cpu*/cpuidle/state*; do [ -d $c ] && echo $c:$(cat $c/name 2>/dev/null):$(cat $c/disable 2>/dev/null); done"
+      description: "cpu_idle_states 命令"
+      when_to_use: "按需执行 cpu_idle_states 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_hotplug_offline:
+      template: "echo 0 > /sys/devices/system/cpu/cpu{0}/online"
+      description: "cpu_hotplug_offline 命令"
+      when_to_use: "按需执行 cpu_hotplug_offline 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    cpu_hotplug_online:
+      template: "echo 1 > /sys/devices/system/cpu/cpu{0}/online"
+      description: "cpu_hotplug_online 命令"
+      when_to_use: "按需执行 cpu_hotplug_online 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # DLA（Deep Learning Accelerator，Xavier/Orin 含）
-  # ─────────────────────────────────────────────────────────
-  dla_info:           "cat /sys/kernel/debug/nvdla0/stats"
-  dla0_status:        "cat /sys/kernel/debug/nvdla0/status"
-  dla1_status:        "cat /sys/kernel/debug/nvdla1/status"
+    # ─────────────────────────────────────────────────────────
+    # GPU（NVIDIA Ampere / Volta / Maxwell）
+    # ─────────────────────────────────────────────────────────
+    gpu_freq_cur:
+      template: "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/cur_freq"
+      description: "gpu_freq_cur 命令"
+      when_to_use: "按需执行 gpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_freq_max:
+      template: "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/max_freq"
+      description: "gpu_freq_max 命令"
+      when_to_use: "按需执行 gpu_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_governor:
+      template: "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/governor"
+      description: "gpu_governor 命令"
+      when_to_use: "按需执行 gpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_set_max_freq:
+      template: "echo {0} > /sys/devices/17000000.gpu/devfreq/17000000.gpu/max_freq"
+      description: "gpu_set_max_freq 命令"
+      when_to_use: "按需执行 gpu_set_max_freq 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    gpu_railgate_enable:
+      template: "echo 1 > /sys/devices/17000000.gpu/railgate_enable"
+      description: "gpu_railgate_enable 命令"
+      when_to_use: "按需执行 gpu_railgate_enable 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_railgate_disable:
+      template: "echo 0 > /sys/devices/17000000.gpu/railgate_enable"
+      description: "gpu_railgate_disable 命令"
+      when_to_use: "按需执行 gpu_railgate_disable 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_load:
+      template: "cat /sys/devices/17000000.gpu/load"
+      description: "gpu_load 命令"
+      when_to_use: "按需执行 gpu_load 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_busy_time:
+      template: "cat /sys/devices/17000000.gpu/devfreq/17000000.gpu/stats/total_trans"
+      description: "gpu_busy_time 命令"
+      when_to_use: "按需执行 gpu_busy_time 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # CUDA 版本
+    cuda_version:
+      template: "nvcc --version"
+      description: "cuda_version 命令"
+      when_to_use: "按需执行 cuda_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cudnn_version:
+      template: "cat /usr/include/cudnn_version.h | grep -E 'CUDNN_MAJOR|CUDNN_MINOR|CUDNN_PATCHLEVEL'"
+      description: "cudnn_version 命令"
+      when_to_use: "按需执行 cudnn_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cuda_visible_devices:
+      template: "echo $CUDA_VISIBLE_DEVICES"
+      description: "cuda_visible_devices 命令"
+      when_to_use: "按需执行 cuda_visible_devices 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cuda_samples_ls:
+      template: "ls /usr/local/cuda/samples"
+      description: "cuda_samples_ls 命令"
+      when_to_use: "按需执行 cuda_samples_ls 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cuda_sample_devicequery:
+      template: "/usr/local/cuda/samples/1_Utilities/deviceQuery/deviceQuery"
+      description: "cuda_sample_devicequery 命令"
+      when_to_use: "按需执行 cuda_sample_devicequery 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cuda_smi_like:
+      template: "cat /sys/kernel/debug/gpu_stats 2>/dev/null"
+      description: "cuda_smi_like 命令"
+      when_to_use: "按需执行 cuda_smi_like 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # TensorRT（Jetson AI 推理核心）
-  tensorrt_version:   "dpkg -l | grep nvinfer"
-  trtexec_help:       "trtexec --help"
-  trtexec_bench_fp16: "trtexec --onnx={0} --fp16 --workspace=1024"
-  trtexec_bench_int8: "trtexec --onnx={0} --int8 --workspace=1024"
-  trtexec_build_engine_fp16: "trtexec --onnx={0} --saveEngine={1} --fp16 --workspace=1024"
-  trtexec_run_engine: "trtexec --loadEngine={0}"
-  trtexec_dla0:       "trtexec --onnx={0} --useDLACore=0 --allowGPUFallback"
-  trtexec_dla1:       "trtexec --onnx={0} --useDLACore=1 --allowGPUFallback"
+    # ─────────────────────────────────────────────────────────
+    # DLA（Deep Learning Accelerator，Xavier/Orin 含）
+    # ─────────────────────────────────────────────────────────
+    dla_info:
+      template: "cat /sys/kernel/debug/nvdla0/stats"
+      description: "dla_info 命令"
+      when_to_use: "按需执行 dla_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    dla0_status:
+      template: "cat /sys/kernel/debug/nvdla0/status"
+      description: "dla0_status 命令"
+      when_to_use: "按需执行 dla0_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    dla1_status:
+      template: "cat /sys/kernel/debug/nvdla1/status"
+      description: "dla1_status 命令"
+      when_to_use: "按需执行 dla1_status 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # DeepStream（视频 AI 管线）
-  deepstream_version: "dpkg -l | grep deepstream"
-  deepstream_apps:    "ls /opt/nvidia/deepstream/deepstream/sources/apps/sample_apps"
-  deepstream_test1:   "deepstream-app -c /opt/nvidia/deepstream/deepstream/samples/configs/deepstream-app/source1_usb_dec_infer_resnet_int8.txt"
-  deepstream_plugins: "gst-inspect-1.0 | grep -E 'nvv4l2|nvargus|nvstreammux|nvinfer'"
+    # TensorRT（Jetson AI 推理核心）
+    tensorrt_version:
+      template: "dpkg -l | grep nvinfer"
+      description: "tensorrt_version 命令"
+      when_to_use: "按需执行 tensorrt_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    trtexec_help:
+      template: "trtexec --help"
+      description: "trtexec_help 命令"
+      when_to_use: "按需执行 trtexec_help 场景"
+      args: []
+      examples: []
+      risk: "low"
+    trtexec_bench_fp16:
+      template: "trtexec --onnx={0} --fp16 --workspace=1024"
+      description: "trtexec_bench_fp16 命令"
+      when_to_use: "按需执行 trtexec_bench_fp16 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    trtexec_bench_int8:
+      template: "trtexec --onnx={0} --int8 --workspace=1024"
+      description: "trtexec_bench_int8 命令"
+      when_to_use: "按需执行 trtexec_bench_int8 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    trtexec_build_engine_fp16:
+      template: "trtexec --onnx={0} --saveEngine={1} --fp16 --workspace=1024"
+      description: "trtexec_build_engine_fp16 命令"
+      when_to_use: "按需执行 trtexec_build_engine_fp16 场景"
+      args: ["arg0", "arg1"]
+      examples: []
+      risk: "low"
+    trtexec_run_engine:
+      template: "trtexec --loadEngine={0}"
+      description: "trtexec_run_engine 命令"
+      when_to_use: "按需执行 trtexec_run_engine 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    trtexec_dla0:
+      template: "trtexec --onnx={0} --useDLACore=0 --allowGPUFallback"
+      description: "trtexec_dla0 命令"
+      when_to_use: "按需执行 trtexec_dla0 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    trtexec_dla1:
+      template: "trtexec --onnx={0} --useDLACore=1 --allowGPUFallback"
+      description: "trtexec_dla1 命令"
+      when_to_use: "按需执行 trtexec_dla1 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 电源监控（INA3221 电流传感器，读取实时功耗）
-  # ─────────────────────────────────────────────────────────
-  # 路径因型号不同，以下以 AGX Orin 为例
-  power_all:          "cat /sys/bus/i2c/drivers/ina3221/*/iio:device*/in_power*_input"
-  power_module:       "cat /sys/bus/i2c/drivers/ina3221/1-0040/iio:device0/in_power0_input"
-  current_module:     "cat /sys/bus/i2c/drivers/ina3221/1-0040/iio:device0/in_current0_input"
-  voltage_module:     "cat /sys/bus/i2c/drivers/ina3221/1-0040/iio:device0/in_voltage0_input"
-  power_all_currents: "cat /sys/bus/i2c/drivers/ina3221/*/iio:device*/in_current*_input"
-  power_all_voltages: "cat /sys/bus/i2c/drivers/ina3221/*/iio:device*/in_voltage*_input"
+    # DeepStream（视频 AI 管线）
+    deepstream_version:
+      template: "dpkg -l | grep deepstream"
+      description: "deepstream_version 命令"
+      when_to_use: "按需执行 deepstream_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    deepstream_apps:
+      template: "ls /opt/nvidia/deepstream/deepstream/sources/apps/sample_apps"
+      description: "deepstream_apps 命令"
+      when_to_use: "按需执行 deepstream_apps 场景"
+      args: []
+      examples: []
+      risk: "low"
+    deepstream_test1:
+      template: "deepstream-app -c /opt/nvidia/deepstream/deepstream/samples/configs/deepstream-app/source1_usb_dec_infer_resnet_int8.txt"
+      description: "deepstream_test1 命令"
+      when_to_use: "按需执行 deepstream_test1 场景"
+      args: []
+      examples: []
+      risk: "low"
+    deepstream_plugins:
+      template: "gst-inspect-1.0 | grep -E 'nvv4l2|nvargus|nvstreammux|nvinfer'"
+      description: "deepstream_plugins 命令"
+      when_to_use: "按需执行 deepstream_plugins 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 风扇控制（不同机型路径不同，以下同时覆盖常见路径）
-  fan_pwm_legacy_get: "cat /sys/devices/pwm-fan/target_pwm"
-  fan_pwm_legacy_set: "echo {0} > /sys/devices/pwm-fan/target_pwm"
-  fan_pwm_hwmon_get:  "cat /sys/class/hwmon/hwmon*/pwm1"
-  fan_pwm_hwmon_set:  "echo {0} > /sys/class/hwmon/hwmon*/pwm1"
-  fan_rpm_get:        "cat /sys/class/hwmon/hwmon*/fan1_input"
-  fan_control_mode:   "cat /sys/class/hwmon/hwmon*/pwm1_enable"
-  fan_set_manual:     "echo 1 > /sys/class/hwmon/hwmon*/pwm1_enable"
-  fan_set_auto:       "echo 2 > /sys/class/hwmon/hwmon*/pwm1_enable"
-  nvfancontrol_status: "systemctl status nvfancontrol --no-pager"
-  nvfancontrol_restart: "systemctl restart nvfancontrol"
+    # ─────────────────────────────────────────────────────────
+    # 电源监控（INA3221 电流传感器，读取实时功耗）
+    # ─────────────────────────────────────────────────────────
+    # 路径因型号不同，以下以 AGX Orin 为例
+    power_all:
+      template: "cat /sys/bus/i2c/drivers/ina3221/*/iio:device*/in_power*_input"
+      description: "power_all 命令"
+      when_to_use: "按需执行 power_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    power_module:
+      template: "cat /sys/bus/i2c/drivers/ina3221/1-0040/iio:device0/in_power0_input"
+      description: "power_module 命令"
+      when_to_use: "按需执行 power_module 场景"
+      args: []
+      examples: []
+      risk: "low"
+    current_module:
+      template: "cat /sys/bus/i2c/drivers/ina3221/1-0040/iio:device0/in_current0_input"
+      description: "current_module 命令"
+      when_to_use: "按需执行 current_module 场景"
+      args: []
+      examples: []
+      risk: "low"
+    voltage_module:
+      template: "cat /sys/bus/i2c/drivers/ina3221/1-0040/iio:device0/in_voltage0_input"
+      description: "voltage_module 命令"
+      when_to_use: "按需执行 voltage_module 场景"
+      args: []
+      examples: []
+      risk: "low"
+    power_all_currents:
+      template: "cat /sys/bus/i2c/drivers/ina3221/*/iio:device*/in_current*_input"
+      description: "power_all_currents 命令"
+      when_to_use: "按需执行 power_all_currents 场景"
+      args: []
+      examples: []
+      risk: "low"
+    power_all_voltages:
+      template: "cat /sys/bus/i2c/drivers/ina3221/*/iio:device*/in_voltage*_input"
+      description: "power_all_voltages 命令"
+      when_to_use: "按需执行 power_all_voltages 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 存储（UFS / eMMC / NVMe）
-  # ─────────────────────────────────────────────────────────
-  storage_list:       "ls -l /dev/mmcblk* /dev/nvme* /dev/sd*"
-  nvme_info:          "nvme list"
-  nvme_smart:         "nvme smart-log /dev/nvme0n1"
-  disk_usage:         "df -h"
+    # 风扇控制（不同机型路径不同，以下同时覆盖常见路径）
+    fan_pwm_legacy_get:
+      template: "cat /sys/devices/pwm-fan/target_pwm"
+      description: "fan_pwm_legacy_get 命令"
+      when_to_use: "按需执行 fan_pwm_legacy_get 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fan_pwm_legacy_set:
+      template: "echo {0} > /sys/devices/pwm-fan/target_pwm"
+      description: "fan_pwm_legacy_set 命令"
+      when_to_use: "按需执行 fan_pwm_legacy_set 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    fan_pwm_hwmon_get:
+      template: "cat /sys/class/hwmon/hwmon*/pwm1"
+      description: "fan_pwm_hwmon_get 命令"
+      when_to_use: "按需执行 fan_pwm_hwmon_get 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fan_pwm_hwmon_set:
+      template: "echo {0} > /sys/class/hwmon/hwmon*/pwm1"
+      description: "fan_pwm_hwmon_set 命令"
+      when_to_use: "按需执行 fan_pwm_hwmon_set 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    fan_rpm_get:
+      template: "cat /sys/class/hwmon/hwmon*/fan1_input"
+      description: "fan_rpm_get 命令"
+      when_to_use: "按需执行 fan_rpm_get 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fan_control_mode:
+      template: "cat /sys/class/hwmon/hwmon*/pwm1_enable"
+      description: "fan_control_mode 命令"
+      when_to_use: "按需执行 fan_control_mode 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fan_set_manual:
+      template: "echo 1 > /sys/class/hwmon/hwmon*/pwm1_enable"
+      description: "fan_set_manual 命令"
+      when_to_use: "按需执行 fan_set_manual 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fan_set_auto:
+      template: "echo 2 > /sys/class/hwmon/hwmon*/pwm1_enable"
+      description: "fan_set_auto 命令"
+      when_to_use: "按需执行 fan_set_auto 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvfancontrol_status:
+      template: "systemctl status nvfancontrol --no-pager"
+      description: "nvfancontrol_status 命令"
+      when_to_use: "按需执行 nvfancontrol_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvfancontrol_restart:
+      template: "systemctl restart nvfancontrol"
+      description: "nvfancontrol_restart 命令"
+      when_to_use: "按需执行 nvfancontrol_restart 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 摄像头（CSI，需 JetPack 驱动支持）
-  # ─────────────────────────────────────────────────────────
-  camera_list:        "v4l2-ctl --list-devices"
-  camera_formats:     "v4l2-ctl -d /dev/video{0} --list-formats-ext"
-  nvargus_status:     "systemctl status nvargus-daemon --no-pager"
-  nvargus_restart:    "systemctl restart nvargus-daemon"
-  nvargus_logs:       "journalctl -u nvargus-daemon -n 100 --no-pager"
-  csi_video_nodes:    "ls -l /dev/video* /dev/media*"
-  camera_v4l2_all:    "for d in /dev/video*; do v4l2-ctl -d $d --all; done"
-  argus_preview_10s:  "timeout 10 gst-launch-1.0 nvarguscamerasrc ! fakesink"
-  csi_capture_jpeg:   "gst-launch-1.0 -e nvarguscamerasrc num-buffers=1 ! 'video/x-raw(memory:NVMM),width=1920,height=1080,framerate=30/1' ! nvjpegenc ! filesink location={0}"
-  csi_capture_h264_10s: "timeout 10 gst-launch-1.0 -e nvarguscamerasrc ! nvv4l2h264enc ! h264parse ! qtmux ! filesink location={0}"
+    # ─────────────────────────────────────────────────────────
+    # 存储（UFS / eMMC / NVMe）
+    # ─────────────────────────────────────────────────────────
+    storage_list:
+      template: "ls -l /dev/mmcblk* /dev/nvme* /dev/sd*"
+      description: "storage_list 命令"
+      when_to_use: "按需执行 storage_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvme_info:
+      template: "nvme list"
+      description: "nvme_info 命令"
+      when_to_use: "按需执行 nvme_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvme_smart:
+      template: "nvme smart-log /dev/nvme0n1"
+      description: "nvme_smart 命令"
+      when_to_use: "按需执行 nvme_smart 场景"
+      args: []
+      examples: []
+      risk: "low"
+    disk_usage:
+      template: "df -h"
+      description: "disk_usage 命令"
+      when_to_use: "按需执行 disk_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # NVENC / NVDEC 设备节点（视频编解码能力检查）
-  nvenc_node:         "ls -l /dev/nvhost-msenc"
-  nvdec_node:         "ls -l /dev/nvhost-nvdec"
-  vic_node:           "ls -l /dev/nvhost-vic"
-  nvjpeg_node:        "ls -l /dev/nvhost-nvjpg"
-  nvenc_gst_test:     "gst-launch-1.0 -e videotestsrc num-buffers=120 ! nvvidconv ! nvv4l2h264enc ! h264parse ! fakesink"
-  nvdec_gst_test:     "gst-launch-1.0 filesrc location={0} ! qtdemux ! h264parse ! nvv4l2decoder ! fakesink"
+    # ─────────────────────────────────────────────────────────
+    # 摄像头（CSI，需 JetPack 驱动支持）
+    # ─────────────────────────────────────────────────────────
+    camera_list:
+      template: "v4l2-ctl --list-devices"
+      description: "camera_list 命令"
+      when_to_use: "按需执行 camera_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    camera_formats:
+      template: "v4l2-ctl -d /dev/video{0} --list-formats-ext"
+      description: "camera_formats 命令"
+      when_to_use: "按需执行 camera_formats 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    nvargus_status:
+      template: "systemctl status nvargus-daemon --no-pager"
+      description: "nvargus_status 命令"
+      when_to_use: "按需执行 nvargus_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvargus_restart:
+      template: "systemctl restart nvargus-daemon"
+      description: "nvargus_restart 命令"
+      when_to_use: "按需执行 nvargus_restart 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvargus_logs:
+      template: "journalctl -u nvargus-daemon -n 100 --no-pager"
+      description: "nvargus_logs 命令"
+      when_to_use: "按需执行 nvargus_logs 场景"
+      args: []
+      examples: []
+      risk: "low"
+    csi_video_nodes:
+      template: "ls -l /dev/video* /dev/media*"
+      description: "csi_video_nodes 命令"
+      when_to_use: "按需执行 csi_video_nodes 场景"
+      args: []
+      examples: []
+      risk: "low"
+    camera_v4l2_all:
+      template: "for d in /dev/video*; do v4l2-ctl -d $d --all; done"
+      description: "camera_v4l2_all 命令"
+      when_to_use: "按需执行 camera_v4l2_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    argus_preview_10s:
+      template: "timeout 10 gst-launch-1.0 nvarguscamerasrc ! fakesink"
+      description: "argus_preview_10s 命令"
+      when_to_use: "按需执行 argus_preview_10s 场景"
+      args: []
+      examples: []
+      risk: "low"
+    csi_capture_jpeg:
+      template: "gst-launch-1.0 -e nvarguscamerasrc num-buffers=1 ! 'video/x-raw(memory:NVMM),width=1920,height=1080,framerate=30/1' ! nvjpegenc ! filesink location={0}"
+      description: "csi_capture_jpeg 命令"
+      when_to_use: "按需执行 csi_capture_jpeg 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    csi_capture_h264_10s:
+      template: "timeout 10 gst-launch-1.0 -e nvarguscamerasrc ! nvv4l2h264enc ! h264parse ! qtmux ! filesink location={0}"
+      description: "csi_capture_h264_10s 命令"
+      when_to_use: "按需执行 csi_capture_h264_10s 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 网络
-  # ─────────────────────────────────────────────────────────
-  net_ip_addr:        "ip addr"
-  net_ip_route:       "ip route"
-  eth_mac:            "cat /sys/class/net/eth0/address"
-  ping_test:          "ping -c 4 {0}"
+    # NVENC / NVDEC 设备节点（视频编解码能力检查）
+    nvenc_node:
+      template: "ls -l /dev/nvhost-msenc"
+      description: "nvenc_node 命令"
+      when_to_use: "按需执行 nvenc_node 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvdec_node:
+      template: "ls -l /dev/nvhost-nvdec"
+      description: "nvdec_node 命令"
+      when_to_use: "按需执行 nvdec_node 场景"
+      args: []
+      examples: []
+      risk: "low"
+    vic_node:
+      template: "ls -l /dev/nvhost-vic"
+      description: "vic_node 命令"
+      when_to_use: "按需执行 vic_node 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvjpeg_node:
+      template: "ls -l /dev/nvhost-nvjpg"
+      description: "nvjpeg_node 命令"
+      when_to_use: "按需执行 nvjpeg_node 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvenc_gst_test:
+      template: "gst-launch-1.0 -e videotestsrc num-buffers=120 ! nvvidconv ! nvv4l2h264enc ! h264parse ! fakesink"
+      description: "nvenc_gst_test 命令"
+      when_to_use: "按需执行 nvenc_gst_test 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nvdec_gst_test:
+      template: "gst-launch-1.0 filesrc location={0} ! qtdemux ! h264parse ! nvv4l2decoder ! fakesink"
+      description: "nvdec_gst_test 命令"
+      when_to_use: "按需执行 nvdec_gst_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 容器（Jetson 上常用 Docker 跑 AI 推理）
-  # ─────────────────────────────────────────────────────────
-  docker_ps:          "docker ps"
-  docker_images:      "docker images"
-  docker_stats:       "docker stats --no-stream"
-  docker_logs:        "docker logs --tail 50 {0}"
-  docker_runtime_info: "docker info | grep -i -E 'Runtimes|nvidia'"
-  docker_run_nvidia_smoke: "docker run --rm --runtime nvidia nvcr.io/nvidia/l4t-base:r35.4.1 uname -a"
-  docker_run_cuda_smoke: "docker run --rm --runtime nvidia nvcr.io/nvidia/l4t-base:r35.4.1 bash -lc 'ls /usr/local/cuda || true'"
-  docker_run_tegrastats: "docker run --rm --runtime nvidia --pid=host nvcr.io/nvidia/l4t-base:r35.4.1 tegrastats --interval 1000 --stop"
+    # ─────────────────────────────────────────────────────────
+    # 网络
+    # ─────────────────────────────────────────────────────────
+    net_ip_addr:
+      template: "ip addr"
+      description: "net_ip_addr 命令"
+      when_to_use: "按需执行 net_ip_addr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_ip_route:
+      template: "ip route"
+      description: "net_ip_route 命令"
+      when_to_use: "按需执行 net_ip_route 场景"
+      args: []
+      examples: []
+      risk: "low"
+    eth_mac:
+      template: "cat /sys/class/net/eth0/address"
+      description: "eth_mac 命令"
+      when_to_use: "按需执行 eth_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ping_test:
+      template: "ping -c 4 {0}"
+      description: "ping_test 命令"
+      when_to_use: "按需执行 ping_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # BPMP 时钟/电源（Jetson 低层调试）
-  bpmp_clocks:        "cat /sys/kernel/debug/bpmp/debug/clk/clk_tree | head -n 120"
-  bpmp_rails:         "cat /sys/kernel/debug/bpmp/debug/regulator/regulator_summary"
-  bpmp_clk_emc:       "cat /sys/kernel/debug/bpmp/debug/clk/emc/rate"
-  bpmp_clk_gpu:       "cat /sys/kernel/debug/bpmp/debug/clk/gpu/rate"
-  bpmp_clk_cpu:       "cat /sys/kernel/debug/bpmp/debug/clk/cluster0/rate 2>/dev/null"
-  bpmp_set_clk_emc:   "echo {0} > /sys/kernel/debug/bpmp/debug/clk/emc/rate"
+    # ─────────────────────────────────────────────────────────
+    # 容器（Jetson 上常用 Docker 跑 AI 推理）
+    # ─────────────────────────────────────────────────────────
+    docker_ps:
+      template: "docker ps"
+      description: "docker_ps 命令"
+      when_to_use: "按需执行 docker_ps 场景"
+      args: []
+      examples: []
+      risk: "low"
+    docker_images:
+      template: "docker images"
+      description: "docker_images 命令"
+      when_to_use: "按需执行 docker_images 场景"
+      args: []
+      examples: []
+      risk: "low"
+    docker_stats:
+      template: "docker stats --no-stream"
+      description: "docker_stats 命令"
+      when_to_use: "按需执行 docker_stats 场景"
+      args: []
+      examples: []
+      risk: "low"
+    docker_logs:
+      template: "docker logs --tail 50 {0}"
+      description: "docker_logs 命令"
+      when_to_use: "按需执行 docker_logs 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    docker_runtime_info:
+      template: "docker info | grep -i -E 'Runtimes|nvidia'"
+      description: "docker_runtime_info 命令"
+      when_to_use: "按需执行 docker_runtime_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    docker_run_nvidia_smoke:
+      template: "docker run --rm --runtime nvidia nvcr.io/nvidia/l4t-base:r35.4.1 uname -a"
+      description: "docker_run_nvidia_smoke 命令"
+      when_to_use: "按需执行 docker_run_nvidia_smoke 场景"
+      args: []
+      examples: []
+      risk: "low"
+    docker_run_cuda_smoke:
+      template: "docker run --rm --runtime nvidia nvcr.io/nvidia/l4t-base:r35.4.1 bash -lc 'ls /usr/local/cuda || true'"
+      description: "docker_run_cuda_smoke 命令"
+      when_to_use: "按需执行 docker_run_cuda_smoke 场景"
+      args: []
+      examples: []
+      risk: "low"
+    docker_run_tegrastats:
+      template: "docker run --rm --runtime nvidia --pid=host nvcr.io/nvidia/l4t-base:r35.4.1 tegrastats --interval 1000 --stop"
+      description: "docker_run_tegrastats 命令"
+      when_to_use: "按需执行 docker_run_tegrastats 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 多媒体框架与依赖探测
-  gst_version:        "gst-launch-1.0 --version"
-  gst_nvidia_plugins: "gst-inspect-1.0 | grep -E 'nvargus|nvv4l2|nvvidconv|nvegl'"
-  ffmpeg_hwaccels:    "ffmpeg -hwaccels"
-  ffmpeg_codecs_nv:   "ffmpeg -codecs | grep -i nv"
+    # BPMP 时钟/电源（Jetson 低层调试）
+    bpmp_clocks:
+      template: "cat /sys/kernel/debug/bpmp/debug/clk/clk_tree | head -n 120"
+      description: "bpmp_clocks 命令"
+      when_to_use: "按需执行 bpmp_clocks 场景"
+      args: []
+      examples: []
+      risk: "low"
+    bpmp_rails:
+      template: "cat /sys/kernel/debug/bpmp/debug/regulator/regulator_summary"
+      description: "bpmp_rails 命令"
+      when_to_use: "按需执行 bpmp_rails 场景"
+      args: []
+      examples: []
+      risk: "low"
+    bpmp_clk_emc:
+      template: "cat /sys/kernel/debug/bpmp/debug/clk/emc/rate"
+      description: "bpmp_clk_emc 命令"
+      when_to_use: "按需执行 bpmp_clk_emc 场景"
+      args: []
+      examples: []
+      risk: "low"
+    bpmp_clk_gpu:
+      template: "cat /sys/kernel/debug/bpmp/debug/clk/gpu/rate"
+      description: "bpmp_clk_gpu 命令"
+      when_to_use: "按需执行 bpmp_clk_gpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    bpmp_clk_cpu:
+      template: "cat /sys/kernel/debug/bpmp/debug/clk/cluster0/rate 2>/dev/null"
+      description: "bpmp_clk_cpu 命令"
+      when_to_use: "按需执行 bpmp_clk_cpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    bpmp_set_clk_emc:
+      template: "echo {0} > /sys/kernel/debug/bpmp/debug/clk/emc/rate"
+      description: "bpmp_set_clk_emc 命令"
+      when_to_use: "按需执行 bpmp_set_clk_emc 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # Python AI 运行时探测（常用于排障）
-  py_torch_cuda:      "python3 -c 'import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())'"
-  py_tf_gpu:          "python3 -c 'import tensorflow as tf; print(tf.__version__, tf.config.list_physical_devices(\"GPU\"))'"
-  py_onnxruntime_gpu: "python3 -c 'import onnxruntime as ort; print(ort.__version__, ort.get_available_providers())'"
+    # 多媒体框架与依赖探测
+    gst_version:
+      template: "gst-launch-1.0 --version"
+      description: "gst_version 命令"
+      when_to_use: "按需执行 gst_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gst_nvidia_plugins:
+      template: "gst-inspect-1.0 | grep -E 'nvargus|nvv4l2|nvvidconv|nvegl'"
+      description: "gst_nvidia_plugins 命令"
+      when_to_use: "按需执行 gst_nvidia_plugins 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ffmpeg_hwaccels:
+      template: "ffmpeg -hwaccels"
+      description: "ffmpeg_hwaccels 命令"
+      when_to_use: "按需执行 ffmpeg_hwaccels 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ffmpeg_codecs_nv:
+      template: "ffmpeg -codecs | grep -i nv"
+      description: "ffmpeg_codecs_nv 命令"
+      when_to_use: "按需执行 ffmpeg_codecs_nv 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # Jetson-IO / 40-pin 头配置（若安装）
-  jetson_io_list:     "ls /opt/nvidia/jetson-io"
-  jetson_io_configs:  "ls /boot/*.dtbo"
+    # Python AI 运行时探测（常用于排障）
+    py_torch_cuda:
+      template: "python3 -c 'import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())'"
+      description: "py_torch_cuda 命令"
+      when_to_use: "按需执行 py_torch_cuda 场景"
+      args: []
+      examples: []
+      risk: "low"
+    py_tf_gpu:
+      template: "python3 -c 'import tensorflow as tf; print(tf.__version__, tf.config.list_physical_devices(\"GPU\"))'"
+      description: "py_tf_gpu 命令"
+      when_to_use: "按需执行 py_tf_gpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    py_onnxruntime_gpu:
+      template: "python3 -c 'import onnxruntime as ort; print(ort.__version__, ort.get_available_providers())'"
+      description: "py_onnxruntime_gpu 命令"
+      when_to_use: "按需执行 py_onnxruntime_gpu 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # Flash/恢复模式相关（主机侧工具，通常在开发主机执行）
-  l4t_flash_help:     "ls /opt/nvidia/l4t*/Linux_for_Tegra/ 2>/dev/null"
-  l4t_flash_devices:  "lsusb | grep -i nvidia"
+    # Jetson-IO / 40-pin 头配置（若安装）
+    jetson_io_list:
+      template: "ls /opt/nvidia/jetson-io"
+      description: "jetson_io_list 命令"
+      when_to_use: "按需执行 jetson_io_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    jetson_io_configs:
+      template: "ls /boot/*.dtbo"
+      description: "jetson_io_configs 命令"
+      when_to_use: "按需执行 jetson_io_configs 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 服务管理（systemd）
-  # ─────────────────────────────────────────────────────────
-  svc_status:         "systemctl status {0} --no-pager"
-  svc_start:          "systemctl start {0}"
-  svc_stop:           "systemctl stop {0}"
-  svc_restart:        "systemctl restart {0}"
-  svc_list:           "systemctl list-units --type=service --no-pager"
-  svc_failed:         "systemctl list-units --state=failed --no-pager"
-  journal_tail:       "journalctl -n {0} --no-pager"
-  journal_svc:        "journalctl -u {0} -n 50 --no-pager"
+    # Flash/恢复模式相关（主机侧工具，通常在开发主机执行）
+    l4t_flash_help:
+      template: "ls /opt/nvidia/l4t*/Linux_for_Tegra/ 2>/dev/null"
+      description: "l4t_flash_help 命令"
+      when_to_use: "按需执行 l4t_flash_help 场景"
+      args: []
+      examples: []
+      risk: "low"
+    l4t_flash_devices:
+      template: "lsusb | grep -i nvidia"
+      description: "l4t_flash_devices 命令"
+      when_to_use: "按需执行 l4t_flash_devices 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 进程
-  # ─────────────────────────────────────────────────────────
-  proc_all:           "ps -ef"
-  proc_grep:          "ps -ef | grep {0} | grep -v grep"
-  proc_top:           "top -bn1 | head -20"
-  sys_mem_usage:      "free -h"
+    # ─────────────────────────────────────────────────────────
+    # 服务管理（systemd）
+    # ─────────────────────────────────────────────────────────
+    svc_status:
+      template: "systemctl status {0} --no-pager"
+      description: "svc_status 命令"
+      when_to_use: "按需执行 svc_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_start:
+      template: "systemctl start {0}"
+      description: "svc_start 命令"
+      when_to_use: "按需执行 svc_start 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_stop:
+      template: "systemctl stop {0}"
+      description: "svc_stop 命令"
+      when_to_use: "按需执行 svc_stop 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_restart:
+      template: "systemctl restart {0}"
+      description: "svc_restart 命令"
+      when_to_use: "按需执行 svc_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_list:
+      template: "systemctl list-units --type=service --no-pager"
+      description: "svc_list 命令"
+      when_to_use: "按需执行 svc_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    svc_failed:
+      template: "systemctl list-units --state=failed --no-pager"
+      description: "svc_failed 命令"
+      when_to_use: "按需执行 svc_failed 场景"
+      args: []
+      examples: []
+      risk: "low"
+    journal_tail:
+      template: "journalctl -n {0} --no-pager"
+      description: "journal_tail 命令"
+      when_to_use: "按需执行 journal_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    journal_svc:
+      template: "journalctl -u {0} -n 50 --no-pager"
+      description: "journal_svc 命令"
+      when_to_use: "按需执行 journal_svc 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+
+    # ─────────────────────────────────────────────────────────
+    # 进程
+    # ─────────────────────────────────────────────────────────
+    proc_all:
+      template: "ps -ef"
+      description: "proc_all 命令"
+      when_to_use: "按需执行 proc_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_grep:
+      template: "ps -ef | grep {0} | grep -v grep"
+      description: "proc_grep 命令"
+      when_to_use: "按需执行 proc_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_top:
+      template: "top -bn1 | head -20"
+      description: "proc_top 命令"
+      when_to_use: "按需执行 proc_top 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_usage:
+      template: "free -h"
+      description: "sys_mem_usage 命令"
+      when_to_use: "按需执行 sys_mem_usage 场景"
+      args: []
+      examples: []
+      risk: "low"

@@ -425,6 +425,21 @@ command_templates:
 - `linux_common.*` 仅允许在 `os_family=linux` 设备执行
 - 未设置 `os_family` 时按 `linux` 处理
 
+### 9.6 平台模板文件用法（templates/platforms）
+
+`templates/platforms/` 下的模板文件已统一为分类结构，默认放在 `linux_common` 分组。
+
+使用方式：
+
+1. 选择对应平台文件（例如 `templates/platforms/nvidia-jetson.yaml`）。
+2. 将其中 `command_templates.linux_common` 的内容合并到你的设备配置文件。
+3. 调用时使用完整 key，例如：`linux_common.tegrastats_once`、`linux_common.sys_uname`。
+
+说明：
+
+- 若你的配置里已存在 `linux_common`，请只合并子项，避免覆盖整组。
+- 若某命令仅适用于特定设备，建议放到 `device_specific.<device_name>` 分组。
+
 ## 11. 开发与扩展
 
 ### 11.1 本地开发

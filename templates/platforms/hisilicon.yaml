@@ -6,67 +6,321 @@
 
 command_templates:
 
-  # 系统基础
-  sys_uname:            "uname -a"
-  sys_uptime:           "uptime"
-  sys_mem_usage:        "free"
-  sys_disk_usage:       "df -h"
-  sys_dmesg_tail:       "dmesg | tail -n {0}"
-  sys_dmesg_grep:       "dmesg | grep {0}"
-  sys_cpu_info:         "cat /proc/cpuinfo"
-  soc_model:            "cat /proc/device-tree/model"
-  soc_compatible:       "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+  linux_common:
 
-  # 温度与频率
-  temp_all:             "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
-  cpu_freq_cur:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
-  cpu_governor:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+    # 系统基础
+    sys_uname:
+      template: "uname -a"
+      description: "sys_uname 命令"
+      when_to_use: "按需执行 sys_uname 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_uptime:
+      template: "uptime"
+      description: "sys_uptime 命令"
+      when_to_use: "按需执行 sys_uptime 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_usage:
+      template: "free"
+      description: "sys_mem_usage 命令"
+      when_to_use: "按需执行 sys_mem_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_disk_usage:
+      template: "df -h"
+      description: "sys_disk_usage 命令"
+      when_to_use: "按需执行 sys_disk_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_dmesg_tail:
+      template: "dmesg | tail -n {0}"
+      description: "sys_dmesg_tail 命令"
+      when_to_use: "按需执行 sys_dmesg_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_dmesg_grep:
+      template: "dmesg | grep {0}"
+      description: "sys_dmesg_grep 命令"
+      when_to_use: "按需执行 sys_dmesg_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_cpu_info:
+      template: "cat /proc/cpuinfo"
+      description: "sys_cpu_info 命令"
+      when_to_use: "按需执行 sys_cpu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    soc_model:
+      template: "cat /proc/device-tree/model"
+      description: "soc_model 命令"
+      when_to_use: "按需执行 soc_model 场景"
+      args: []
+      examples: []
+      risk: "low"
+    soc_compatible:
+      template: "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+      description: "soc_compatible 命令"
+      when_to_use: "按需执行 soc_compatible 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # HiSilicon 多媒体（MPP）
-  # 说明：很多板卡固件预装 hi_* 工具，名称因 SDK 版本有差异
-  mpp_modules:          "lsmod | grep -E 'hi_|hisi_'"
-  vi_status:            "cat /proc/umap/vi"
-  vpss_status:          "cat /proc/umap/vpss"
-  venc_status:          "cat /proc/umap/venc"
-  vdec_status:          "cat /proc/umap/vdec"
-  isp_status:           "cat /proc/umap/isp"
+    # 温度与频率
+    temp_all:
+      template: "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+      description: "temp_all 命令"
+      when_to_use: "按需执行 temp_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_freq_cur:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+      description: "cpu_freq_cur 命令"
+      when_to_use: "按需执行 cpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_governor:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_governor 命令"
+      when_to_use: "按需执行 cpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 硬件身份
-  hw_eth0_mac:          "cat /sys/class/net/eth0/address"
-  hw_eth1_mac:          "cat /sys/class/net/eth1/address"
-  hw_cpu_serial:        "grep Serial /proc/cpuinfo"
+    # HiSilicon 多媒体（MPP）
+    # 说明：很多板卡固件预装 hi_* 工具，名称因 SDK 版本有差异
+    mpp_modules:
+      template: "lsmod | grep -E 'hi_|hisi_'"
+      description: "mpp_modules 命令"
+      when_to_use: "按需执行 mpp_modules 场景"
+      args: []
+      examples: []
+      risk: "low"
+    vi_status:
+      template: "cat /proc/umap/vi"
+      description: "vi_status 命令"
+      when_to_use: "按需执行 vi_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    vpss_status:
+      template: "cat /proc/umap/vpss"
+      description: "vpss_status 命令"
+      when_to_use: "按需执行 vpss_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    venc_status:
+      template: "cat /proc/umap/venc"
+      description: "venc_status 命令"
+      when_to_use: "按需执行 venc_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    vdec_status:
+      template: "cat /proc/umap/vdec"
+      description: "vdec_status 命令"
+      when_to_use: "按需执行 vdec_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    isp_status:
+      template: "cat /proc/umap/isp"
+      description: "isp_status 命令"
+      when_to_use: "按需执行 isp_status 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 存储
-  storage_devices:      "ls -l /dev/mmcblk* /dev/mtd* /dev/sd*"
-  mtd_list:             "cat /proc/mtd"
-  mtd_partitions:       "cat /proc/partitions | grep mtd"
-  emmc_partitions:      "cat /proc/partitions | grep mmcblk"
+    # 硬件身份
+    hw_eth0_mac:
+      template: "cat /sys/class/net/eth0/address"
+      description: "hw_eth0_mac 命令"
+      when_to_use: "按需执行 hw_eth0_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_eth1_mac:
+      template: "cat /sys/class/net/eth1/address"
+      description: "hw_eth1_mac 命令"
+      when_to_use: "按需执行 hw_eth1_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_cpu_serial:
+      template: "grep Serial /proc/cpuinfo"
+      description: "hw_cpu_serial 命令"
+      when_to_use: "按需执行 hw_cpu_serial 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 网络
-  net_ip_addr:          "ip addr"
-  net_ip_route:         "ip route"
-  net_stats:            "cat /proc/net/dev"
-  ping_test:            "ping -c 4 {0}"
+    # 存储
+    storage_devices:
+      template: "ls -l /dev/mmcblk* /dev/mtd* /dev/sd*"
+      description: "storage_devices 命令"
+      when_to_use: "按需执行 storage_devices 场景"
+      args: []
+      examples: []
+      risk: "low"
+    mtd_list:
+      template: "cat /proc/mtd"
+      description: "mtd_list 命令"
+      when_to_use: "按需执行 mtd_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    mtd_partitions:
+      template: "cat /proc/partitions | grep mtd"
+      description: "mtd_partitions 命令"
+      when_to_use: "按需执行 mtd_partitions 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emmc_partitions:
+      template: "cat /proc/partitions | grep mmcblk"
+      description: "emmc_partitions 命令"
+      when_to_use: "按需执行 emmc_partitions 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 进程与服务（BusyBox 场景常无 systemd）
-  proc_all:             "ps"
-  proc_grep:            "ps | grep {0} | grep -v grep"
-  proc_top:             "top -bn1 | head -20"
+    # 网络
+    net_ip_addr:
+      template: "ip addr"
+      description: "net_ip_addr 命令"
+      when_to_use: "按需执行 net_ip_addr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_ip_route:
+      template: "ip route"
+      description: "net_ip_route 命令"
+      when_to_use: "按需执行 net_ip_route 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_stats:
+      template: "cat /proc/net/dev"
+      description: "net_stats 命令"
+      when_to_use: "按需执行 net_stats 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ping_test:
+      template: "ping -c 4 {0}"
+      description: "ping_test 命令"
+      when_to_use: "按需执行 ping_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # service 命令（若系统支持）
-  svc_status:           "service {0} status"
-  svc_start:            "service {0} start"
-  svc_stop:             "service {0} stop"
-  svc_restart:          "service {0} restart"
+    # 进程与服务（BusyBox 场景常无 systemd）
+    proc_all:
+      template: "ps"
+      description: "proc_all 命令"
+      when_to_use: "按需执行 proc_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_grep:
+      template: "ps | grep {0} | grep -v grep"
+      description: "proc_grep 命令"
+      when_to_use: "按需执行 proc_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_top:
+      template: "top -bn1 | head -20"
+      description: "proc_top 命令"
+      when_to_use: "按需执行 proc_top 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # systemd（若系统支持）
-  sysd_status:          "systemctl status {0} --no-pager"
-  sysd_restart:         "systemctl restart {0}"
+    # service 命令（若系统支持）
+    svc_status:
+      template: "service {0} status"
+      description: "svc_status 命令"
+      when_to_use: "按需执行 svc_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_start:
+      template: "service {0} start"
+      description: "svc_start 命令"
+      when_to_use: "按需执行 svc_start 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_stop:
+      template: "service {0} stop"
+      description: "svc_stop 命令"
+      when_to_use: "按需执行 svc_stop 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_restart:
+      template: "service {0} restart"
+      description: "svc_restart 命令"
+      when_to_use: "按需执行 svc_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # 日志
-  log_messages_tail:    "tail -n {0} /var/log/messages"
-  log_kernel_tail:      "dmesg | tail -n {0}"
+    # systemd（若系统支持）
+    sysd_status:
+      template: "systemctl status {0} --no-pager"
+      description: "sysd_status 命令"
+      when_to_use: "按需执行 sysd_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sysd_restart:
+      template: "systemctl restart {0}"
+      description: "sysd_restart 命令"
+      when_to_use: "按需执行 sysd_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # 常见安防应用进程（按需替换）
-  app_media_server:     "ps | grep -E 'media|rtsp|onvif' | grep -v grep"
-  app_restart_media:    "killall {0}; sleep 1; {0} &"
+    # 日志
+    log_messages_tail:
+      template: "tail -n {0} /var/log/messages"
+      description: "log_messages_tail 命令"
+      when_to_use: "按需执行 log_messages_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    log_kernel_tail:
+      template: "dmesg | tail -n {0}"
+      description: "log_kernel_tail 命令"
+      when_to_use: "按需执行 log_kernel_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+
+    # 常见安防应用进程（按需替换）
+    app_media_server:
+      template: "ps | grep -E 'media|rtsp|onvif' | grep -v grep"
+      description: "app_media_server 命令"
+      when_to_use: "按需执行 app_media_server 场景"
+      args: []
+      examples: []
+      risk: "low"
+    app_restart_media:
+      template: "killall {0}; sleep 1; {0} &"
+      description: "app_restart_media 命令"
+      when_to_use: "按需执行 app_restart_media 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"

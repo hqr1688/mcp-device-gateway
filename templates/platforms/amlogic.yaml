@@ -6,132 +6,578 @@
 
 command_templates:
 
-  # ─────────────────────────────────────────────────────────
-  # 硬件身份 & 序列号（Amlogic unifykeys 接口）
-  # ─────────────────────────────────────────────────────────
-  # 说明：unifykeys 是 Amlogic 内核驱动，通过 sysfs 读取烧录到 efuse/EEPROM 的硬件信息。
-  # 写入名称后，再读取 read 节点，一次读取一个字段。
-  hw_usid:        "sh -c 'echo usid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_deviceid:    "sh -c 'echo deviceid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_mac_bt:      "sh -c 'echo mac_bt > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_mac_wifi:    "sh -c 'echo mac_wifi > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_mac_eth:     "sh -c 'echo mac_wifi_2 > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_region_code: "sh -c 'echo region_code > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_custom_key:  "sh -c 'echo {0} > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
-  hw_list_keys:   "cat /sys/class/unifykeys/list"
+  linux_common:
 
-  # CPU 序列号（通用 ARM 方式）
-  hw_cpu_serial:  "grep Serial /proc/cpuinfo"
-  hw_cpu_info:    "grep -E 'Processor|Hardware|Revision' /proc/cpuinfo"
+    # ─────────────────────────────────────────────────────────
+    # 硬件身份 & 序列号（Amlogic unifykeys 接口）
+    # ─────────────────────────────────────────────────────────
+    # 说明：unifykeys 是 Amlogic 内核驱动，通过 sysfs 读取烧录到 efuse/EEPROM 的硬件信息。
+    # 写入名称后，再读取 read 节点，一次读取一个字段。
+    hw_usid:
+      template: "sh -c 'echo usid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_usid 命令"
+      when_to_use: "按需执行 hw_usid 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_deviceid:
+      template: "sh -c 'echo deviceid > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_deviceid 命令"
+      when_to_use: "按需执行 hw_deviceid 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_mac_bt:
+      template: "sh -c 'echo mac_bt > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_mac_bt 命令"
+      when_to_use: "按需执行 hw_mac_bt 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_mac_wifi:
+      template: "sh -c 'echo mac_wifi > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_mac_wifi 命令"
+      when_to_use: "按需执行 hw_mac_wifi 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_mac_eth:
+      template: "sh -c 'echo mac_wifi_2 > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_mac_eth 命令"
+      when_to_use: "按需执行 hw_mac_eth 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_region_code:
+      template: "sh -c 'echo region_code > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_region_code 命令"
+      when_to_use: "按需执行 hw_region_code 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_custom_key:
+      template: "sh -c 'echo {0} > /sys/class/unifykeys/name && cat /sys/class/unifykeys/read'"
+      description: "hw_custom_key 命令"
+      when_to_use: "按需执行 hw_custom_key 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    hw_list_keys:
+      template: "cat /sys/class/unifykeys/list"
+      description: "hw_list_keys 命令"
+      when_to_use: "按需执行 hw_list_keys 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # eMMC CID（制造商/型号/序列号，mmcblkN 根据实际调整）
-  hw_emmc_cid:    "cat /sys/class/block/mmcblk2/device/cid"
-  hw_emmc_name:   "cat /sys/class/block/mmcblk2/device/name"
-  hw_emmc_fwrev:  "cat /sys/class/block/mmcblk2/device/fwrev"
+    # CPU 序列号（通用 ARM 方式）
+    hw_cpu_serial:
+      template: "grep Serial /proc/cpuinfo"
+      description: "hw_cpu_serial 命令"
+      when_to_use: "按需执行 hw_cpu_serial 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_cpu_info:
+      template: "grep -E 'Processor|Hardware|Revision' /proc/cpuinfo"
+      description: "hw_cpu_info 命令"
+      when_to_use: "按需执行 hw_cpu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 以太网 MAC
-  hw_eth0_mac:    "cat /sys/class/net/eth0/address"
-  hw_eth1_mac:    "cat /sys/class/net/eth1/address"
+    # eMMC CID（制造商/型号/序列号，mmcblkN 根据实际调整）
+    hw_emmc_cid:
+      template: "cat /sys/class/block/mmcblk2/device/cid"
+      description: "hw_emmc_cid 命令"
+      when_to_use: "按需执行 hw_emmc_cid 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_emmc_name:
+      template: "cat /sys/class/block/mmcblk2/device/name"
+      description: "hw_emmc_name 命令"
+      when_to_use: "按需执行 hw_emmc_name 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_emmc_fwrev:
+      template: "cat /sys/class/block/mmcblk2/device/fwrev"
+      description: "hw_emmc_fwrev 命令"
+      when_to_use: "按需执行 hw_emmc_fwrev 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 系统状态
-  # ─────────────────────────────────────────────────────────
-  sys_uname:      "uname -a"
-  sys_uptime:     "uptime"
-  sys_dmesg_tail: "dmesg | tail -n {0}"
-  sys_dmesg_grep: "dmesg | grep {0}"
-  sys_cpu_info:   "cat /proc/cpuinfo"
-  sys_mem_info:   "cat /proc/meminfo"
-  sys_mem_usage:  "free -m"
-  sys_disk_usage: "df -h"
-  sys_mounts:     "cat /proc/mounts"
-  sys_cmdline:    "cat /proc/cmdline"
-  sys_version:    "cat /proc/version"
+    # 以太网 MAC
+    hw_eth0_mac:
+      template: "cat /sys/class/net/eth0/address"
+      description: "hw_eth0_mac 命令"
+      when_to_use: "按需执行 hw_eth0_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_eth1_mac:
+      template: "cat /sys/class/net/eth1/address"
+      description: "hw_eth1_mac 命令"
+      when_to_use: "按需执行 hw_eth1_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 温度监控
-  # ─────────────────────────────────────────────────────────
-  # Amlogic 通常有多个热区：CPU/DDR/GPU
-  temp_all:       "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
-  temp_cpu:       "cat /sys/class/thermal/thermal_zone0/temp"
-  temp_ddr:       "cat /sys/class/thermal/thermal_zone1/temp"
-  temp_gpu:       "cat /sys/class/thermal/thermal_zone2/temp"
+    # ─────────────────────────────────────────────────────────
+    # 系统状态
+    # ─────────────────────────────────────────────────────────
+    sys_uname:
+      template: "uname -a"
+      description: "sys_uname 命令"
+      when_to_use: "按需执行 sys_uname 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_uptime:
+      template: "uptime"
+      description: "sys_uptime 命令"
+      when_to_use: "按需执行 sys_uptime 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_dmesg_tail:
+      template: "dmesg | tail -n {0}"
+      description: "sys_dmesg_tail 命令"
+      when_to_use: "按需执行 sys_dmesg_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_dmesg_grep:
+      template: "dmesg | grep {0}"
+      description: "sys_dmesg_grep 命令"
+      when_to_use: "按需执行 sys_dmesg_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_cpu_info:
+      template: "cat /proc/cpuinfo"
+      description: "sys_cpu_info 命令"
+      when_to_use: "按需执行 sys_cpu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_info:
+      template: "cat /proc/meminfo"
+      description: "sys_mem_info 命令"
+      when_to_use: "按需执行 sys_mem_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_usage:
+      template: "free -m"
+      description: "sys_mem_usage 命令"
+      when_to_use: "按需执行 sys_mem_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_disk_usage:
+      template: "df -h"
+      description: "sys_disk_usage 命令"
+      when_to_use: "按需执行 sys_disk_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mounts:
+      template: "cat /proc/mounts"
+      description: "sys_mounts 命令"
+      when_to_use: "按需执行 sys_mounts 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_cmdline:
+      template: "cat /proc/cmdline"
+      description: "sys_cmdline 命令"
+      when_to_use: "按需执行 sys_cmdline 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_version:
+      template: "cat /proc/version"
+      description: "sys_version 命令"
+      when_to_use: "按需执行 sys_version 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # CPU 频率 & 性能
-  # ─────────────────────────────────────────────────────────
-  cpu_freq_cur:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
-  cpu_freq_max:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
-  cpu_freq_min:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
-  cpu_governor:   "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  cpu_set_governor: "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  # 可用调频策略：performance / powersave / ondemand / interactive / userspace
-  cpu_available_governors: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+    # ─────────────────────────────────────────────────────────
+    # 温度监控
+    # ─────────────────────────────────────────────────────────
+    # Amlogic 通常有多个热区：CPU/DDR/GPU
+    temp_all:
+      template: "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
+      description: "temp_all 命令"
+      when_to_use: "按需执行 temp_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_cpu:
+      template: "cat /sys/class/thermal/thermal_zone0/temp"
+      description: "temp_cpu 命令"
+      when_to_use: "按需执行 temp_cpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_ddr:
+      template: "cat /sys/class/thermal/thermal_zone1/temp"
+      description: "temp_ddr 命令"
+      when_to_use: "按需执行 temp_ddr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_gpu:
+      template: "cat /sys/class/thermal/thermal_zone2/temp"
+      description: "temp_gpu 命令"
+      when_to_use: "按需执行 temp_gpu 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # GPU（Mali）
-  # ─────────────────────────────────────────────────────────
-  gpu_freq_cur:   "cat /sys/class/mpgpu/cur_freq"
-  gpu_freq_max:   "cat /sys/class/mpgpu/max_freq"
-  gpu_utilization: "cat /sys/class/mpgpu/scale_mode"
-  gpu_driver:     "cat /sys/module/mali/version"
+    # ─────────────────────────────────────────────────────────
+    # CPU 频率 & 性能
+    # ─────────────────────────────────────────────────────────
+    cpu_freq_cur:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+      description: "cpu_freq_cur 命令"
+      when_to_use: "按需执行 cpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_freq_max:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
+      description: "cpu_freq_max 命令"
+      when_to_use: "按需执行 cpu_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_freq_min:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+      description: "cpu_freq_min 命令"
+      when_to_use: "按需执行 cpu_freq_min 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_governor:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_governor 命令"
+      when_to_use: "按需执行 cpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_set_governor:
+      template: "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_set_governor 命令"
+      when_to_use: "按需执行 cpu_set_governor 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    # 可用调频策略：performance / powersave / ondemand / interactive / userspace
+    cpu_available_governors:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+      description: "cpu_available_governors 命令"
+      when_to_use: "按需执行 cpu_available_governors 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # NPU（Neural Processing Unit，S905D3、T950D4、C308X 等含 NPU）
-  # ─────────────────────────────────────────────────────────
-  npu_info:       "cat /sys/class/npu_model/info"
-  npu_freq:       "cat /sys/class/npu_model/clk_rate"
-  npu_utilization: "cat /sys/class/npu_model/status"
+    # ─────────────────────────────────────────────────────────
+    # GPU（Mali）
+    # ─────────────────────────────────────────────────────────
+    gpu_freq_cur:
+      template: "cat /sys/class/mpgpu/cur_freq"
+      description: "gpu_freq_cur 命令"
+      when_to_use: "按需执行 gpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_freq_max:
+      template: "cat /sys/class/mpgpu/max_freq"
+      description: "gpu_freq_max 命令"
+      when_to_use: "按需执行 gpu_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_utilization:
+      template: "cat /sys/class/mpgpu/scale_mode"
+      description: "gpu_utilization 命令"
+      when_to_use: "按需执行 gpu_utilization 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_driver:
+      template: "cat /sys/module/mali/version"
+      description: "gpu_driver 命令"
+      when_to_use: "按需执行 gpu_driver 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # eMMC / 存储
-  # ─────────────────────────────────────────────────────────
-  storage_list:   "ls -l /dev/mmcblk*"
-  emmc_life:      "cat /sys/class/block/mmcblk2/device/life_time"
-  emmc_partitions: "cat /proc/partitions | grep mmcblk"
-  mtd_list:       "cat /proc/mtd"
+    # ─────────────────────────────────────────────────────────
+    # NPU（Neural Processing Unit，S905D3、T950D4、C308X 等含 NPU）
+    # ─────────────────────────────────────────────────────────
+    npu_info:
+      template: "cat /sys/class/npu_model/info"
+      description: "npu_info 命令"
+      when_to_use: "按需执行 npu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    npu_freq:
+      template: "cat /sys/class/npu_model/clk_rate"
+      description: "npu_freq 命令"
+      when_to_use: "按需执行 npu_freq 场景"
+      args: []
+      examples: []
+      risk: "low"
+    npu_utilization:
+      template: "cat /sys/class/npu_model/status"
+      description: "npu_utilization 命令"
+      when_to_use: "按需执行 npu_utilization 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 网络
-  # ─────────────────────────────────────────────────────────
-  net_ip_addr:    "ip addr"
-  net_ip_route:   "ip route"
-  net_stats:      "cat /proc/net/dev"
-  wifi_status:    "iw dev wlan0 info"
-  wifi_scan:      "iw dev wlan0 scan | grep SSID"
-  wifi_link:      "iw dev wlan0 link"
-  wifi_station:   "iw dev wlan0 station dump"
-  ping_test:      "ping -c 4 {0}"
+    # ─────────────────────────────────────────────────────────
+    # eMMC / 存储
+    # ─────────────────────────────────────────────────────────
+    storage_list:
+      template: "ls -l /dev/mmcblk*"
+      description: "storage_list 命令"
+      when_to_use: "按需执行 storage_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emmc_life:
+      template: "cat /sys/class/block/mmcblk2/device/life_time"
+      description: "emmc_life 命令"
+      when_to_use: "按需执行 emmc_life 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emmc_partitions:
+      template: "cat /proc/partitions | grep mmcblk"
+      description: "emmc_partitions 命令"
+      when_to_use: "按需执行 emmc_partitions 场景"
+      args: []
+      examples: []
+      risk: "low"
+    mtd_list:
+      template: "cat /proc/mtd"
+      description: "mtd_list 命令"
+      when_to_use: "按需执行 mtd_list 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 服务管理（systemd）
-  # ─────────────────────────────────────────────────────────
-  svc_status:     "systemctl status {0} --no-pager"
-  svc_start:      "systemctl start {0}"
-  svc_stop:       "systemctl stop {0}"
-  svc_restart:    "systemctl restart {0}"
-  svc_enable:     "systemctl enable {0}"
-  svc_list:       "systemctl list-units --type=service --no-pager"
-  svc_failed:     "systemctl list-units --state=failed --no-pager"
-  journal_tail:   "journalctl -n {0} --no-pager"
-  journal_svc:    "journalctl -u {0} -n 50 --no-pager"
-  journal_boot:   "journalctl -b --no-pager | tail -n 100"
+    # ─────────────────────────────────────────────────────────
+    # 网络
+    # ─────────────────────────────────────────────────────────
+    net_ip_addr:
+      template: "ip addr"
+      description: "net_ip_addr 命令"
+      when_to_use: "按需执行 net_ip_addr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_ip_route:
+      template: "ip route"
+      description: "net_ip_route 命令"
+      when_to_use: "按需执行 net_ip_route 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_stats:
+      template: "cat /proc/net/dev"
+      description: "net_stats 命令"
+      when_to_use: "按需执行 net_stats 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_status:
+      template: "iw dev wlan0 info"
+      description: "wifi_status 命令"
+      when_to_use: "按需执行 wifi_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_scan:
+      template: "iw dev wlan0 scan | grep SSID"
+      description: "wifi_scan 命令"
+      when_to_use: "按需执行 wifi_scan 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_link:
+      template: "iw dev wlan0 link"
+      description: "wifi_link 命令"
+      when_to_use: "按需执行 wifi_link 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_station:
+      template: "iw dev wlan0 station dump"
+      description: "wifi_station 命令"
+      when_to_use: "按需执行 wifi_station 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ping_test:
+      template: "ping -c 4 {0}"
+      description: "ping_test 命令"
+      when_to_use: "按需执行 ping_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 进程
-  # ─────────────────────────────────────────────────────────
-  proc_all:       "ps -ef"
-  proc_grep:      "ps -ef | grep {0} | grep -v grep"
-  proc_top:       "top -bn1 | head -20"
-  proc_mem_top:   "ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head -20"
+    # ─────────────────────────────────────────────────────────
+    # 服务管理（systemd）
+    # ─────────────────────────────────────────────────────────
+    svc_status:
+      template: "systemctl status {0} --no-pager"
+      description: "svc_status 命令"
+      when_to_use: "按需执行 svc_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_start:
+      template: "systemctl start {0}"
+      description: "svc_start 命令"
+      when_to_use: "按需执行 svc_start 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_stop:
+      template: "systemctl stop {0}"
+      description: "svc_stop 命令"
+      when_to_use: "按需执行 svc_stop 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_restart:
+      template: "systemctl restart {0}"
+      description: "svc_restart 命令"
+      when_to_use: "按需执行 svc_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_enable:
+      template: "systemctl enable {0}"
+      description: "svc_enable 命令"
+      when_to_use: "按需执行 svc_enable 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_list:
+      template: "systemctl list-units --type=service --no-pager"
+      description: "svc_list 命令"
+      when_to_use: "按需执行 svc_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    svc_failed:
+      template: "systemctl list-units --state=failed --no-pager"
+      description: "svc_failed 命令"
+      when_to_use: "按需执行 svc_failed 场景"
+      args: []
+      examples: []
+      risk: "low"
+    journal_tail:
+      template: "journalctl -n {0} --no-pager"
+      description: "journal_tail 命令"
+      when_to_use: "按需执行 journal_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    journal_svc:
+      template: "journalctl -u {0} -n 50 --no-pager"
+      description: "journal_svc 命令"
+      when_to_use: "按需执行 journal_svc 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    journal_boot:
+      template: "journalctl -b --no-pager | tail -n 100"
+      description: "journal_boot 命令"
+      when_to_use: "按需执行 journal_boot 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 固件 & OTA
-  # ─────────────────────────────────────────────────────────
-  fw_version:     "cat /etc/os-release"
-  fw_build_info:  "cat /etc/build.prop"
-  # 触发本地 OTA 升级包（升级包需已上传至 /tmp/）
-  ota_local_update: "update {0}"
-  # 检查 SoC 型号
-  soc_model:      "cat /sys/class/amlogic_board/board_id"
-  board_type:     "cat /proc/device-tree/amlogic-dt-id"
+    # ─────────────────────────────────────────────────────────
+    # 进程
+    # ─────────────────────────────────────────────────────────
+    proc_all:
+      template: "ps -ef"
+      description: "proc_all 命令"
+      when_to_use: "按需执行 proc_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_grep:
+      template: "ps -ef | grep {0} | grep -v grep"
+      description: "proc_grep 命令"
+      when_to_use: "按需执行 proc_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_top:
+      template: "top -bn1 | head -20"
+      description: "proc_top 命令"
+      when_to_use: "按需执行 proc_top 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_mem_top:
+      template: "ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head -20"
+      description: "proc_mem_top 命令"
+      when_to_use: "按需执行 proc_mem_top 场景"
+      args: []
+      examples: []
+      risk: "low"
+
+    # ─────────────────────────────────────────────────────────
+    # 固件 & OTA
+    # ─────────────────────────────────────────────────────────
+    fw_version:
+      template: "cat /etc/os-release"
+      description: "fw_version 命令"
+      when_to_use: "按需执行 fw_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fw_build_info:
+      template: "cat /etc/build.prop"
+      description: "fw_build_info 命令"
+      when_to_use: "按需执行 fw_build_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # 触发本地 OTA 升级包（升级包需已上传至 /tmp/）
+    ota_local_update:
+      template: "update {0}"
+      description: "ota_local_update 命令"
+      when_to_use: "按需执行 ota_local_update 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    # 检查 SoC 型号
+    soc_model:
+      template: "cat /sys/class/amlogic_board/board_id"
+      description: "soc_model 命令"
+      when_to_use: "按需执行 soc_model 场景"
+      args: []
+      examples: []
+      risk: "low"
+    board_type:
+      template: "cat /proc/device-tree/amlogic-dt-id"
+      description: "board_type 命令"
+      when_to_use: "按需执行 board_type 场景"
+      args: []
+      examples: []
+      risk: "low"

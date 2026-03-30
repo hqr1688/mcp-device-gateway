@@ -6,42 +6,224 @@
 
 command_templates:
 
-  sys_uname:            "uname -a"
-  sys_uptime:           "uptime"
-  sys_mem_usage:        "free -m"
-  sys_disk_usage:       "df -h"
-  sys_cpu_info:         "cat /proc/cpuinfo"
-  soc_model:            "cat /proc/device-tree/model"
-  soc_compatible:       "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
-  sys_dmesg_tail:       "dmesg | tail -n {0}"
-  sys_dmesg_grep:       "dmesg | grep {0}"
+  linux_common:
 
-  temp_all:             "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
-  temp_cpu:             "cat /sys/class/thermal/thermal_zone0/temp"
+    sys_uname:
+      template: "uname -a"
+      description: "sys_uname 命令"
+      when_to_use: "按需执行 sys_uname 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_uptime:
+      template: "uptime"
+      description: "sys_uptime 命令"
+      when_to_use: "按需执行 sys_uptime 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_usage:
+      template: "free -m"
+      description: "sys_mem_usage 命令"
+      when_to_use: "按需执行 sys_mem_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_disk_usage:
+      template: "df -h"
+      description: "sys_disk_usage 命令"
+      when_to_use: "按需执行 sys_disk_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_cpu_info:
+      template: "cat /proc/cpuinfo"
+      description: "sys_cpu_info 命令"
+      when_to_use: "按需执行 sys_cpu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    soc_model:
+      template: "cat /proc/device-tree/model"
+      description: "soc_model 命令"
+      when_to_use: "按需执行 soc_model 场景"
+      args: []
+      examples: []
+      risk: "low"
+    soc_compatible:
+      template: "cat /proc/device-tree/compatible | tr '\\0' '\\n'"
+      description: "soc_compatible 命令"
+      when_to_use: "按需执行 soc_compatible 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_dmesg_tail:
+      template: "dmesg | tail -n {0}"
+      description: "sys_dmesg_tail 命令"
+      when_to_use: "按需执行 sys_dmesg_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_dmesg_grep:
+      template: "dmesg | grep {0}"
+      description: "sys_dmesg_grep 命令"
+      when_to_use: "按需执行 sys_dmesg_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  cpu_freq_cur:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
-  cpu_governor:         "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+    temp_all:
+      template: "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+      description: "temp_all 命令"
+      when_to_use: "按需执行 temp_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_cpu:
+      template: "cat /sys/class/thermal/thermal_zone0/temp"
+      description: "temp_cpu 命令"
+      when_to_use: "按需执行 temp_cpu 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # CedarX / VPU（型号差异较大，以 dmesg 检查为主）
-  vpu_info:             "dmesg | grep -i -E 'cedar|ve|vpu'"
+    cpu_freq_cur:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+      description: "cpu_freq_cur 命令"
+      when_to_use: "按需执行 cpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_governor:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_governor 命令"
+      when_to_use: "按需执行 cpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  storage_devices:      "ls -l /dev/mmcblk* /dev/sd*"
-  mtd_list:             "cat /proc/mtd"
+    # CedarX / VPU（型号差异较大，以 dmesg 检查为主）
+    vpu_info:
+      template: "dmesg | grep -i -E 'cedar|ve|vpu'"
+      description: "vpu_info 命令"
+      when_to_use: "按需执行 vpu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  net_ip_addr:          "ip addr"
-  net_ip_route:         "ip route"
-  net_stats:            "cat /proc/net/dev"
-  eth0_mac:             "cat /sys/class/net/eth0/address"
-  wifi_status:          "iw dev wlan0 info"
-  ping_test:            "ping -c 4 {0}"
+    storage_devices:
+      template: "ls -l /dev/mmcblk* /dev/sd*"
+      description: "storage_devices 命令"
+      when_to_use: "按需执行 storage_devices 场景"
+      args: []
+      examples: []
+      risk: "low"
+    mtd_list:
+      template: "cat /proc/mtd"
+      description: "mtd_list 命令"
+      when_to_use: "按需执行 mtd_list 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  i2c_detect_bus:       "i2cdetect -y {0}"
-  spi_devices:          "ls /dev/spidev*"
+    net_ip_addr:
+      template: "ip addr"
+      description: "net_ip_addr 命令"
+      when_to_use: "按需执行 net_ip_addr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_ip_route:
+      template: "ip route"
+      description: "net_ip_route 命令"
+      when_to_use: "按需执行 net_ip_route 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_stats:
+      template: "cat /proc/net/dev"
+      description: "net_stats 命令"
+      when_to_use: "按需执行 net_stats 场景"
+      args: []
+      examples: []
+      risk: "low"
+    eth0_mac:
+      template: "cat /sys/class/net/eth0/address"
+      description: "eth0_mac 命令"
+      when_to_use: "按需执行 eth0_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_status:
+      template: "iw dev wlan0 info"
+      description: "wifi_status 命令"
+      when_to_use: "按需执行 wifi_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ping_test:
+      template: "ping -c 4 {0}"
+      description: "ping_test 命令"
+      when_to_use: "按需执行 ping_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  svc_status:           "systemctl status {0} --no-pager"
-  svc_restart:          "systemctl restart {0}"
-  svc_list:             "systemctl list-units --type=service --no-pager"
+    i2c_detect_bus:
+      template: "i2cdetect -y {0}"
+      description: "i2c_detect_bus 命令"
+      when_to_use: "按需执行 i2c_detect_bus 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    spi_devices:
+      template: "ls /dev/spidev*"
+      description: "spi_devices 命令"
+      when_to_use: "按需执行 spi_devices 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  proc_all:             "ps -ef"
-  proc_grep:            "ps -ef | grep {0} | grep -v grep"
-  proc_top:             "top -bn1 | head -20"
+    svc_status:
+      template: "systemctl status {0} --no-pager"
+      description: "svc_status 命令"
+      when_to_use: "按需执行 svc_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_restart:
+      template: "systemctl restart {0}"
+      description: "svc_restart 命令"
+      when_to_use: "按需执行 svc_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_list:
+      template: "systemctl list-units --type=service --no-pager"
+      description: "svc_list 命令"
+      when_to_use: "按需执行 svc_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+
+    proc_all:
+      template: "ps -ef"
+      description: "proc_all 命令"
+      when_to_use: "按需执行 proc_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_grep:
+      template: "ps -ef | grep {0} | grep -v grep"
+      description: "proc_grep 命令"
+      when_to_use: "按需执行 proc_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_top:
+      template: "top -bn1 | head -20"
+      description: "proc_top 命令"
+      when_to_use: "按需执行 proc_top 场景"
+      args: []
+      examples: []
+      risk: "low"

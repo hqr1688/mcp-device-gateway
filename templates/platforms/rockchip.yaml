@@ -6,121 +6,477 @@
 
 command_templates:
 
-  # ─────────────────────────────────────────────────────────
-  # 系统信息
-  # ─────────────────────────────────────────────────────────
-  sys_uname:          "uname -a"
-  sys_uptime:         "uptime"
-  sys_cpu_info:       "cat /proc/cpuinfo"
-  sys_mem_usage:      "free -m"
-  sys_disk_usage:     "df -h"
-  sys_dmesg_tail:     "dmesg | tail -n {0}"
-  sys_dmesg_grep:     "dmesg | grep {0}"
-  sys_cmdline:        "cat /proc/cmdline"
-  soc_model:          "cat /proc/device-tree/compatible | tr '\\0' '\\n' | head -3"
-  board_model:        "cat /proc/device-tree/model"
-  fw_version:         "cat /etc/os-release"
+  linux_common:
 
-  # ─────────────────────────────────────────────────────────
-  # 温度监控
-  # ─────────────────────────────────────────────────────────
-  # RK3588 有 CPU/GPU/NPU 多个热区
-  temp_all:           "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
-  temp_cpu:           "cat /sys/class/thermal/thermal_zone0/temp"
-  temp_gpu:           "cat /sys/class/thermal/thermal_zone1/temp"
-  # RK3588/Pro NPU 温度
-  temp_npu:           "cat /sys/class/thermal/thermal_zone2/temp"
+    # ─────────────────────────────────────────────────────────
+    # 系统信息
+    # ─────────────────────────────────────────────────────────
+    sys_uname:
+      template: "uname -a"
+      description: "sys_uname 命令"
+      when_to_use: "按需执行 sys_uname 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_uptime:
+      template: "uptime"
+      description: "sys_uptime 命令"
+      when_to_use: "按需执行 sys_uptime 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_cpu_info:
+      template: "cat /proc/cpuinfo"
+      description: "sys_cpu_info 命令"
+      when_to_use: "按需执行 sys_cpu_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_usage:
+      template: "free -m"
+      description: "sys_mem_usage 命令"
+      when_to_use: "按需执行 sys_mem_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_disk_usage:
+      template: "df -h"
+      description: "sys_disk_usage 命令"
+      when_to_use: "按需执行 sys_disk_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_dmesg_tail:
+      template: "dmesg | tail -n {0}"
+      description: "sys_dmesg_tail 命令"
+      when_to_use: "按需执行 sys_dmesg_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_dmesg_grep:
+      template: "dmesg | grep {0}"
+      description: "sys_dmesg_grep 命令"
+      when_to_use: "按需执行 sys_dmesg_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_cmdline:
+      template: "cat /proc/cmdline"
+      description: "sys_cmdline 命令"
+      when_to_use: "按需执行 sys_cmdline 场景"
+      args: []
+      examples: []
+      risk: "low"
+    soc_model:
+      template: "cat /proc/device-tree/compatible | tr '\\0' '\\n' | head -3"
+      description: "soc_model 命令"
+      when_to_use: "按需执行 soc_model 场景"
+      args: []
+      examples: []
+      risk: "low"
+    board_model:
+      template: "cat /proc/device-tree/model"
+      description: "board_model 命令"
+      when_to_use: "按需执行 board_model 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fw_version:
+      template: "cat /etc/os-release"
+      description: "fw_version 命令"
+      when_to_use: "按需执行 fw_version 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # CPU 频率 & 性能
-  # ─────────────────────────────────────────────────────────
-  # RK3588 含大核(A76)和小核(A55)，路径分别为 cpu0(小) 和 cpu6(大)
-  cpu_big_freq_cur:   "cat /sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq"
-  cpu_big_freq_max:   "cat /sys/devices/system/cpu/cpu6/cpufreq/cpuinfo_max_freq"
-  cpu_little_freq_cur: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
-  cpu_little_freq_max: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
-  cpu_governor:       "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  cpu_set_governor:   "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  cpu_available_governors: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+    # ─────────────────────────────────────────────────────────
+    # 温度监控
+    # ─────────────────────────────────────────────────────────
+    # RK3588 有 CPU/GPU/NPU 多个热区
+    temp_all:
+      template: "paste /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp"
+      description: "temp_all 命令"
+      when_to_use: "按需执行 temp_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_cpu:
+      template: "cat /sys/class/thermal/thermal_zone0/temp"
+      description: "temp_cpu 命令"
+      when_to_use: "按需执行 temp_cpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    temp_gpu:
+      template: "cat /sys/class/thermal/thermal_zone1/temp"
+      description: "temp_gpu 命令"
+      when_to_use: "按需执行 temp_gpu 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # RK3588/Pro NPU 温度
+    temp_npu:
+      template: "cat /sys/class/thermal/thermal_zone2/temp"
+      description: "temp_npu 命令"
+      when_to_use: "按需执行 temp_npu 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # GPU（Mali G610 on RK3588 / Mali T860 on RK3399）
-  # ─────────────────────────────────────────────────────────
-  gpu_freq_cur:       "cat /sys/class/devfreq/fb000000.gpu/cur_freq"
-  gpu_freq_max:       "cat /sys/class/devfreq/fb000000.gpu/max_freq"
-  gpu_governor:       "cat /sys/class/devfreq/fb000000.gpu/governor"
-  gpu_utilization:    "cat /sys/class/devfreq/fb000000.gpu/load"
+    # ─────────────────────────────────────────────────────────
+    # CPU 频率 & 性能
+    # ─────────────────────────────────────────────────────────
+    # RK3588 含大核(A76)和小核(A55)，路径分别为 cpu0(小) 和 cpu6(大)
+    cpu_big_freq_cur:
+      template: "cat /sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq"
+      description: "cpu_big_freq_cur 命令"
+      when_to_use: "按需执行 cpu_big_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_big_freq_max:
+      template: "cat /sys/devices/system/cpu/cpu6/cpufreq/cpuinfo_max_freq"
+      description: "cpu_big_freq_max 命令"
+      when_to_use: "按需执行 cpu_big_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_little_freq_cur:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+      description: "cpu_little_freq_cur 命令"
+      when_to_use: "按需执行 cpu_little_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_little_freq_max:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+      description: "cpu_little_freq_max 命令"
+      when_to_use: "按需执行 cpu_little_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_governor:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_governor 命令"
+      when_to_use: "按需执行 cpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
+    cpu_set_governor:
+      template: "echo {0} > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+      description: "cpu_set_governor 命令"
+      when_to_use: "按需执行 cpu_set_governor 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    cpu_available_governors:
+      template: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+      description: "cpu_available_governors 命令"
+      when_to_use: "按需执行 cpu_available_governors 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # NPU（RKNN，RK3588/RK3399Pro/RV1109/RV1126 含 NPU）
-  # ─────────────────────────────────────────────────────────
-  npu_freq_cur:       "cat /sys/kernel/debug/rknpu/load"
-  npu_driver:         "cat /sys/module/rknpu/version"
-  # RKNN runtime 版本（需安装 rknn-toolkit2）
-  npu_runtime_ver:    "python3 -c 'import rknn; print(rknn.__version__)'"
+    # ─────────────────────────────────────────────────────────
+    # GPU（Mali G610 on RK3588 / Mali T860 on RK3399）
+    # ─────────────────────────────────────────────────────────
+    gpu_freq_cur:
+      template: "cat /sys/class/devfreq/fb000000.gpu/cur_freq"
+      description: "gpu_freq_cur 命令"
+      when_to_use: "按需执行 gpu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_freq_max:
+      template: "cat /sys/class/devfreq/fb000000.gpu/max_freq"
+      description: "gpu_freq_max 命令"
+      when_to_use: "按需执行 gpu_freq_max 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_governor:
+      template: "cat /sys/class/devfreq/fb000000.gpu/governor"
+      description: "gpu_governor 命令"
+      when_to_use: "按需执行 gpu_governor 场景"
+      args: []
+      examples: []
+      risk: "low"
+    gpu_utilization:
+      template: "cat /sys/class/devfreq/fb000000.gpu/load"
+      description: "gpu_utilization 命令"
+      when_to_use: "按需执行 gpu_utilization 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 存储（eMMC / UFS）
-  # ─────────────────────────────────────────────────────────
-  storage_list:       "ls -l /dev/mmcblk*"
-  emmc_life:          "cat /sys/class/block/mmcblk0/device/life_time"
-  emmc_enhanced_area: "cat /sys/class/block/mmcblk0/device/enhanced_area_offset"
-  emmc_partitions:    "cat /proc/partitions | grep mmcblk"
-  flash_partitions:   "cat /proc/mtd"
+    # ─────────────────────────────────────────────────────────
+    # NPU（RKNN，RK3588/RK3399Pro/RV1109/RV1126 含 NPU）
+    # ─────────────────────────────────────────────────────────
+    npu_freq_cur:
+      template: "cat /sys/kernel/debug/rknpu/load"
+      description: "npu_freq_cur 命令"
+      when_to_use: "按需执行 npu_freq_cur 场景"
+      args: []
+      examples: []
+      risk: "low"
+    npu_driver:
+      template: "cat /sys/module/rknpu/version"
+      description: "npu_driver 命令"
+      when_to_use: "按需执行 npu_driver 场景"
+      args: []
+      examples: []
+      risk: "low"
+    # RKNN runtime 版本（需安装 rknn-toolkit2）
+    npu_runtime_ver:
+      template: "python3 -c 'import rknn; print(rknn.__version__)'"
+      description: "npu_runtime_ver 命令"
+      when_to_use: "按需执行 npu_runtime_ver 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 硬件身份
-  # ─────────────────────────────────────────────────────────
-  hw_cpu_serial:      "grep Serial /proc/cpuinfo"
-  hw_eth0_mac:        "cat /sys/class/net/eth0/address"
-  hw_eth1_mac:        "cat /sys/class/net/eth1/address"
+    # ─────────────────────────────────────────────────────────
+    # 存储（eMMC / UFS）
+    # ─────────────────────────────────────────────────────────
+    storage_list:
+      template: "ls -l /dev/mmcblk*"
+      description: "storage_list 命令"
+      when_to_use: "按需执行 storage_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emmc_life:
+      template: "cat /sys/class/block/mmcblk0/device/life_time"
+      description: "emmc_life 命令"
+      when_to_use: "按需执行 emmc_life 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emmc_enhanced_area:
+      template: "cat /sys/class/block/mmcblk0/device/enhanced_area_offset"
+      description: "emmc_enhanced_area 命令"
+      when_to_use: "按需执行 emmc_enhanced_area 场景"
+      args: []
+      examples: []
+      risk: "low"
+    emmc_partitions:
+      template: "cat /proc/partitions | grep mmcblk"
+      description: "emmc_partitions 命令"
+      when_to_use: "按需执行 emmc_partitions 场景"
+      args: []
+      examples: []
+      risk: "low"
+    flash_partitions:
+      template: "cat /proc/mtd"
+      description: "flash_partitions 命令"
+      when_to_use: "按需执行 flash_partitions 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 网络
-  # ─────────────────────────────────────────────────────────
-  net_ip_addr:        "ip addr"
-  net_ip_route:       "ip route"
-  net_stats:          "cat /proc/net/dev"
-  wifi_status:        "iw dev wlan0 info"
-  wifi_link:          "iw dev wlan0 link"
-  ping_test:          "ping -c 4 {0}"
+    # ─────────────────────────────────────────────────────────
+    # 硬件身份
+    # ─────────────────────────────────────────────────────────
+    hw_cpu_serial:
+      template: "grep Serial /proc/cpuinfo"
+      description: "hw_cpu_serial 命令"
+      when_to_use: "按需执行 hw_cpu_serial 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_eth0_mac:
+      template: "cat /sys/class/net/eth0/address"
+      description: "hw_eth0_mac 命令"
+      when_to_use: "按需执行 hw_eth0_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
+    hw_eth1_mac:
+      template: "cat /sys/class/net/eth1/address"
+      description: "hw_eth1_mac 命令"
+      when_to_use: "按需执行 hw_eth1_mac 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 服务管理（systemd）
-  # ─────────────────────────────────────────────────────────
-  svc_status:         "systemctl status {0} --no-pager"
-  svc_start:          "systemctl start {0}"
-  svc_stop:           "systemctl stop {0}"
-  svc_restart:        "systemctl restart {0}"
-  svc_list:           "systemctl list-units --type=service --no-pager"
-  svc_failed:         "systemctl list-units --state=failed --no-pager"
-  journal_tail:       "journalctl -n {0} --no-pager"
-  journal_svc:        "journalctl -u {0} -n 50 --no-pager"
+    # ─────────────────────────────────────────────────────────
+    # 网络
+    # ─────────────────────────────────────────────────────────
+    net_ip_addr:
+      template: "ip addr"
+      description: "net_ip_addr 命令"
+      when_to_use: "按需执行 net_ip_addr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_ip_route:
+      template: "ip route"
+      description: "net_ip_route 命令"
+      when_to_use: "按需执行 net_ip_route 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_stats:
+      template: "cat /proc/net/dev"
+      description: "net_stats 命令"
+      when_to_use: "按需执行 net_stats 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_status:
+      template: "iw dev wlan0 info"
+      description: "wifi_status 命令"
+      when_to_use: "按需执行 wifi_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    wifi_link:
+      template: "iw dev wlan0 link"
+      description: "wifi_link 命令"
+      when_to_use: "按需执行 wifi_link 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ping_test:
+      template: "ping -c 4 {0}"
+      description: "ping_test 命令"
+      when_to_use: "按需执行 ping_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # 进程
-  # ─────────────────────────────────────────────────────────
-  proc_all:           "ps -ef"
-  proc_grep:          "ps -ef | grep {0} | grep -v grep"
-  proc_top:           "top -bn1 | head -20"
+    # ─────────────────────────────────────────────────────────
+    # 服务管理（systemd）
+    # ─────────────────────────────────────────────────────────
+    svc_status:
+      template: "systemctl status {0} --no-pager"
+      description: "svc_status 命令"
+      when_to_use: "按需执行 svc_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_start:
+      template: "systemctl start {0}"
+      description: "svc_start 命令"
+      when_to_use: "按需执行 svc_start 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_stop:
+      template: "systemctl stop {0}"
+      description: "svc_stop 命令"
+      when_to_use: "按需执行 svc_stop 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_restart:
+      template: "systemctl restart {0}"
+      description: "svc_restart 命令"
+      when_to_use: "按需执行 svc_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_list:
+      template: "systemctl list-units --type=service --no-pager"
+      description: "svc_list 命令"
+      when_to_use: "按需执行 svc_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    svc_failed:
+      template: "systemctl list-units --state=failed --no-pager"
+      description: "svc_failed 命令"
+      when_to_use: "按需执行 svc_failed 场景"
+      args: []
+      examples: []
+      risk: "low"
+    journal_tail:
+      template: "journalctl -n {0} --no-pager"
+      description: "journal_tail 命令"
+      when_to_use: "按需执行 journal_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    journal_svc:
+      template: "journalctl -u {0} -n 50 --no-pager"
+      description: "journal_svc 命令"
+      when_to_use: "按需执行 journal_svc 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # RKDevTool / 烧录辅助（需安装 rkdeveloptool 或 upgrade_tool）
-  # ─────────────────────────────────────────────────────────
-  # 注：以下命令通常需要设备以 Maskrom 或 Loader 模式连接 USB，
-  #     在 Linux 主机侧执行，而非设备内部执行
-  # rk_tool_version: "rkdeveloptool version"
-  # rk_device_list:  "rkdeveloptool ld"
+    # ─────────────────────────────────────────────────────────
+    # 进程
+    # ─────────────────────────────────────────────────────────
+    proc_all:
+      template: "ps -ef"
+      description: "proc_all 命令"
+      when_to_use: "按需执行 proc_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_grep:
+      template: "ps -ef | grep {0} | grep -v grep"
+      description: "proc_grep 命令"
+      when_to_use: "按需执行 proc_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_top:
+      template: "top -bn1 | head -20"
+      description: "proc_top 命令"
+      when_to_use: "按需执行 proc_top 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # ─────────────────────────────────────────────────────────
-  # ISP & Camera（RK3588/RV1126 含 ISP）
-  # ─────────────────────────────────────────────────────────
-  isp_version:        "cat /sys/module/video_rkisp/version"
-  camera_list:        "ls /dev/video*"
+    # ─────────────────────────────────────────────────────────
+    # RKDevTool / 烧录辅助（需安装 rkdeveloptool 或 upgrade_tool）
+    # ─────────────────────────────────────────────────────────
+    # 注：以下命令通常需要设备以 Maskrom 或 Loader 模式连接 USB，
+    #     在 Linux 主机侧执行，而非设备内部执行
+    # rk_tool_version: "rkdeveloptool version"
+    # rk_device_list:  "rkdeveloptool ld"
 
-  # ─────────────────────────────────────────────────────────
-  # 电源管理
-  # ─────────────────────────────────────────────────────────
-  power_domains:      "cat /sys/kernel/debug/pm_genpd/pm_genpd_summary"
-  suspend_state:      "cat /sys/power/state"
-  clk_summary:        "cat /sys/kernel/debug/clk/clk_summary | head -60"
+    # ─────────────────────────────────────────────────────────
+    # ISP & Camera（RK3588/RV1126 含 ISP）
+    # ─────────────────────────────────────────────────────────
+    isp_version:
+      template: "cat /sys/module/video_rkisp/version"
+      description: "isp_version 命令"
+      when_to_use: "按需执行 isp_version 场景"
+      args: []
+      examples: []
+      risk: "low"
+    camera_list:
+      template: "ls /dev/video*"
+      description: "camera_list 命令"
+      when_to_use: "按需执行 camera_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+
+    # ─────────────────────────────────────────────────────────
+    # 电源管理
+    # ─────────────────────────────────────────────────────────
+    power_domains:
+      template: "cat /sys/kernel/debug/pm_genpd/pm_genpd_summary"
+      description: "power_domains 命令"
+      when_to_use: "按需执行 power_domains 场景"
+      args: []
+      examples: []
+      risk: "low"
+    suspend_state:
+      template: "cat /sys/power/state"
+      description: "suspend_state 命令"
+      when_to_use: "按需执行 suspend_state 场景"
+      args: []
+      examples: []
+      risk: "low"
+    clk_summary:
+      template: "cat /sys/kernel/debug/clk/clk_summary | head -60"
+      description: "clk_summary 命令"
+      when_to_use: "按需执行 clk_summary 场景"
+      args: []
+      examples: []
+      risk: "low"

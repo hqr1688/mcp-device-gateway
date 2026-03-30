@@ -6,66 +6,344 @@
 
 command_templates:
 
-  # 系统信息
-  owrt_release:       "cat /etc/openwrt_release"
-  owrt_banner:        "cat /etc/banner"
-  sys_uname:          "uname -a"
-  sys_uptime:         "uptime"
-  sys_mem_usage:      "free"
-  sys_disk_usage:     "df -h"
-  sys_dmesg_tail:     "dmesg | tail -n {0}"
-  sys_logread_tail:   "logread | tail -n {0}"
-  sys_logread_grep:   "logread | grep {0}"
+  linux_common:
 
-  # UCI 配置（OpenWrt 核心）
-  uci_show_all:       "uci show"
-  uci_show_pkg:       "uci show {0}"
-  uci_get:            "uci get {0}"
-  uci_set:            "uci set {0}={1}"
-  uci_commit_pkg:     "uci commit {0}"
+    # 系统信息
+    owrt_release:
+      template: "cat /etc/openwrt_release"
+      description: "owrt_release 命令"
+      when_to_use: "按需执行 owrt_release 场景"
+      args: []
+      examples: []
+      risk: "low"
+    owrt_banner:
+      template: "cat /etc/banner"
+      description: "owrt_banner 命令"
+      when_to_use: "按需执行 owrt_banner 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_uname:
+      template: "uname -a"
+      description: "sys_uname 命令"
+      when_to_use: "按需执行 sys_uname 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_uptime:
+      template: "uptime"
+      description: "sys_uptime 命令"
+      when_to_use: "按需执行 sys_uptime 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_mem_usage:
+      template: "free"
+      description: "sys_mem_usage 命令"
+      when_to_use: "按需执行 sys_mem_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_disk_usage:
+      template: "df -h"
+      description: "sys_disk_usage 命令"
+      when_to_use: "按需执行 sys_disk_usage 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_dmesg_tail:
+      template: "dmesg | tail -n {0}"
+      description: "sys_dmesg_tail 命令"
+      when_to_use: "按需执行 sys_dmesg_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_logread_tail:
+      template: "logread | tail -n {0}"
+      description: "sys_logread_tail 命令"
+      when_to_use: "按需执行 sys_logread_tail 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    sys_logread_grep:
+      template: "logread | grep {0}"
+      description: "sys_logread_grep 命令"
+      when_to_use: "按需执行 sys_logread_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # 网络
-  net_ifstatus:       "ifstatus {0}"
-  net_ip_addr:        "ip addr"
-  net_ip_route:       "ip route"
-  net_bridge:         "brctl show"
-  net_dnsmasq_leases: "cat /tmp/dhcp.leases"
-  net_wifi_status:    "ubus call network.wireless status"
-  net_wifi_reload:    "wifi reload"
-  net_wifi_up:        "wifi up"
-  net_wifi_down:      "wifi down"
-  ping_test:          "ping -c 4 {0}"
+    # UCI 配置（OpenWrt 核心）
+    uci_show_all:
+      template: "uci show"
+      description: "uci_show_all 命令"
+      when_to_use: "按需执行 uci_show_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    uci_show_pkg:
+      template: "uci show {0}"
+      description: "uci_show_pkg 命令"
+      when_to_use: "按需执行 uci_show_pkg 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    uci_get:
+      template: "uci get {0}"
+      description: "uci_get 命令"
+      when_to_use: "按需执行 uci_get 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    uci_set:
+      template: "uci set {0}={1}"
+      description: "uci_set 命令"
+      when_to_use: "按需执行 uci_set 场景"
+      args: ["arg0", "arg1"]
+      examples: []
+      risk: "low"
+    uci_commit_pkg:
+      template: "uci commit {0}"
+      description: "uci_commit_pkg 命令"
+      when_to_use: "按需执行 uci_commit_pkg 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # 防火墙
-  fw_status:          "service firewall status"
-  fw_restart:         "service firewall restart"
-  fw_rules:           "iptables -S"
-  nft_rules:          "nft list ruleset"
+    # 网络
+    net_ifstatus:
+      template: "ifstatus {0}"
+      description: "net_ifstatus 命令"
+      when_to_use: "按需执行 net_ifstatus 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    net_ip_addr:
+      template: "ip addr"
+      description: "net_ip_addr 命令"
+      when_to_use: "按需执行 net_ip_addr 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_ip_route:
+      template: "ip route"
+      description: "net_ip_route 命令"
+      when_to_use: "按需执行 net_ip_route 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_bridge:
+      template: "brctl show"
+      description: "net_bridge 命令"
+      when_to_use: "按需执行 net_bridge 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_dnsmasq_leases:
+      template: "cat /tmp/dhcp.leases"
+      description: "net_dnsmasq_leases 命令"
+      when_to_use: "按需执行 net_dnsmasq_leases 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_wifi_status:
+      template: "ubus call network.wireless status"
+      description: "net_wifi_status 命令"
+      when_to_use: "按需执行 net_wifi_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_wifi_reload:
+      template: "wifi reload"
+      description: "net_wifi_reload 命令"
+      when_to_use: "按需执行 net_wifi_reload 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_wifi_up:
+      template: "wifi up"
+      description: "net_wifi_up 命令"
+      when_to_use: "按需执行 net_wifi_up 场景"
+      args: []
+      examples: []
+      risk: "low"
+    net_wifi_down:
+      template: "wifi down"
+      description: "net_wifi_down 命令"
+      when_to_use: "按需执行 net_wifi_down 场景"
+      args: []
+      examples: []
+      risk: "low"
+    ping_test:
+      template: "ping -c 4 {0}"
+      description: "ping_test 命令"
+      when_to_use: "按需执行 ping_test 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # 进程与服务（procd）
-  svc_list:           "service"
-  svc_status:         "service {0} status"
-  svc_start:          "service {0} start"
-  svc_stop:           "service {0} stop"
-  svc_restart:        "service {0} restart"
-  proc_all:           "ps w"
-  proc_grep:          "ps w | grep {0} | grep -v grep"
-  proc_top:           "top -bn1 | head -20"
+    # 防火墙
+    fw_status:
+      template: "service firewall status"
+      description: "fw_status 命令"
+      when_to_use: "按需执行 fw_status 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fw_restart:
+      template: "service firewall restart"
+      description: "fw_restart 命令"
+      when_to_use: "按需执行 fw_restart 场景"
+      args: []
+      examples: []
+      risk: "low"
+    fw_rules:
+      template: "iptables -S"
+      description: "fw_rules 命令"
+      when_to_use: "按需执行 fw_rules 场景"
+      args: []
+      examples: []
+      risk: "low"
+    nft_rules:
+      template: "nft list ruleset"
+      description: "nft_rules 命令"
+      when_to_use: "按需执行 nft_rules 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 包管理
-  opkg_list_installed: "opkg list-installed"
-  opkg_update:        "opkg update"
-  opkg_install:       "opkg install {0}"
-  opkg_remove:        "opkg remove {0}"
+    # 进程与服务（procd）
+    svc_list:
+      template: "service"
+      description: "svc_list 命令"
+      when_to_use: "按需执行 svc_list 场景"
+      args: []
+      examples: []
+      risk: "low"
+    svc_status:
+      template: "service {0} status"
+      description: "svc_status 命令"
+      when_to_use: "按需执行 svc_status 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_start:
+      template: "service {0} start"
+      description: "svc_start 命令"
+      when_to_use: "按需执行 svc_start 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_stop:
+      template: "service {0} stop"
+      description: "svc_stop 命令"
+      when_to_use: "按需执行 svc_stop 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    svc_restart:
+      template: "service {0} restart"
+      description: "svc_restart 命令"
+      when_to_use: "按需执行 svc_restart 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_all:
+      template: "ps w"
+      description: "proc_all 命令"
+      when_to_use: "按需执行 proc_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+    proc_grep:
+      template: "ps w | grep {0} | grep -v grep"
+      description: "proc_grep 命令"
+      when_to_use: "按需执行 proc_grep 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    proc_top:
+      template: "top -bn1 | head -20"
+      description: "proc_top 命令"
+      when_to_use: "按需执行 proc_top 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 存储
-  storage_mount:      "mount"
-  storage_block_info: "block info"
-  storage_devices:    "ls -l /dev/mmcblk* /dev/sd*"
+    # 包管理
+    opkg_list_installed:
+      template: "opkg list-installed"
+      description: "opkg_list_installed 命令"
+      when_to_use: "按需执行 opkg_list_installed 场景"
+      args: []
+      examples: []
+      risk: "low"
+    opkg_update:
+      template: "opkg update"
+      description: "opkg_update 命令"
+      when_to_use: "按需执行 opkg_update 场景"
+      args: []
+      examples: []
+      risk: "low"
+    opkg_install:
+      template: "opkg install {0}"
+      description: "opkg_install 命令"
+      when_to_use: "按需执行 opkg_install 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
+    opkg_remove:
+      template: "opkg remove {0}"
+      description: "opkg_remove 命令"
+      when_to_use: "按需执行 opkg_remove 场景"
+      args: ["arg0"]
+      examples: []
+      risk: "low"
 
-  # 温度（平台差异大，这里给通用路径）
-  temp_all:           "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+    # 存储
+    storage_mount:
+      template: "mount"
+      description: "storage_mount 命令"
+      when_to_use: "按需执行 storage_mount 场景"
+      args: []
+      examples: []
+      risk: "low"
+    storage_block_info:
+      template: "block info"
+      description: "storage_block_info 命令"
+      when_to_use: "按需执行 storage_block_info 场景"
+      args: []
+      examples: []
+      risk: "low"
+    storage_devices:
+      template: "ls -l /dev/mmcblk* /dev/sd*"
+      description: "storage_devices 命令"
+      when_to_use: "按需执行 storage_devices 场景"
+      args: []
+      examples: []
+      risk: "low"
 
-  # 系统操作
-  sys_reboot:         "reboot"
-  sys_poweroff:       "poweroff"
+    # 温度（平台差异大，这里给通用路径）
+    temp_all:
+      template: "for z in /sys/class/thermal/thermal_zone*; do [ -d $z ] && echo $(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null); done"
+      description: "temp_all 命令"
+      when_to_use: "按需执行 temp_all 场景"
+      args: []
+      examples: []
+      risk: "low"
+
+    # 系统操作
+    sys_reboot:
+      template: "reboot"
+      description: "sys_reboot 命令"
+      when_to_use: "按需执行 sys_reboot 场景"
+      args: []
+      examples: []
+      risk: "low"
+    sys_poweroff:
+      template: "poweroff"
+      description: "sys_poweroff 命令"
+      when_to_use: "按需执行 sys_poweroff 场景"
+      args: []
+      examples: []
+      risk: "low"
