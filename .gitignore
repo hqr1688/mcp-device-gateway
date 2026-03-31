@@ -47,8 +47,11 @@ mcp_transfer_test*.txt
 
 # 私有设备配置（包含密钥路径/密码，不应提交）
 # 建议使用 devices.local.yaml 或 devices.production.yaml 作为本地配置文件名
+devices_*.yaml
 devices.local.yaml
 devices.production.yaml
+!devices.example.yaml
+!devices.production.example.yaml
 
 # Notebook checkpoints
 .ipynb_checkpoints/

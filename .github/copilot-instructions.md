@@ -27,21 +27,22 @@ mcp-device-gateway
 # 或
 python -m mcp_device_gateway.server
 
-# 暂无测试套件 — security.py 和 config.py 是优先级最高的测试目标
+# 运行测试
+python -m unittest discover -s tests
 ```
 
 **环境变量**（均为可选，覆盖默认值）：
 
-| 变量                  | 默认值                     | 用途                       |
-| --------------------- | -------------------------- | -------------------------- |
-| `MCP_DEVICE_CONFIG` | `./devices.example.yaml` | 设备配置文件路径           |
-| `MCP_AUDIT_LOG`     | `./mcp_audit.log`        | 审计日志路径（JSONL 格式） |
-| `MCP_TRANSPORT`     | `stdio`                  | MCP 传输层                 |
+| 变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `MCP_DEVICE_CONFIG` | `./devices.example.yaml` | 设备配置文件路径 |
+| `MCP_AUDIT_LOG` | `./mcp_audit.log` | 审计日志路径（JSONL 格式） |
+| `MCP_TRANSPORT` | `stdio` | MCP 传输层 |
 
 ## 架构
 
-```
-server.py          ← FastMCP 入口；定义 5 个工具；写入 JSONL 审计日志
+```text
+server.py          ← FastMCP 入口；定义工具、资源、提示模板；写入 JSONL 审计日志
 ├── config.py      ← 加载 YAML → 冻结数据类（AppConfig、DeviceConfig）
 ├── security.py    ← sanitize_args() 正则校验 + is_path_allowed() 前缀检查
 └── ssh_client.py  ← SshDeviceClient 上下文管理器（paramiko）；ExecResult 数据类
@@ -49,7 +50,7 @@ server.py          ← FastMCP 入口；定义 5 个工具；写入 JSONL 审计
 
 **请求流程**：工具调用 → `_get_device()` → 安全检查 → `SshDeviceClient` → 执行 → 返回 + `_audit()`
 
-**5 个 MCP 工具**：`device_list`、`device_ping`、`cmd_exec`、`file_upload`、`file_download`
+**当前 MCP 能力**：15 个工具 + 1 个资源（`config://summary`）+ 1 个提示模板（`device_ops_prompt`）
 
 ## 代码约定
 

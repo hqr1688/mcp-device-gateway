@@ -18,8 +18,8 @@ cd /d "%~dp0"
 
 :: ── defaults ────────────────────────────────────────────────────
 set "PYTHON_EXE=python"
-set "CONFIG_PATH="
-set "AUDIT_LOG="
+set "CONFIG_PATH=./devices.example.yaml"
+set "AUDIT_LOG=./mcp_audit.log"
 set "TRANSPORT=stdio"
 
 :: ── parse args ──────────────────────────────────────────────────
@@ -29,7 +29,7 @@ if /i "%~1"=="--config"    ( set "CONFIG_PATH=%~2"  & shift & shift & goto :pars
 if /i "%~1"=="--audit"     ( set "AUDIT_LOG=%~2"    & shift & shift & goto :parse_args )
 if /i "%~1"=="--transport" ( set "TRANSPORT=%~2"    & shift & shift & goto :parse_args )
 if /i "%~1"=="--python"    ( set "PYTHON_EXE=%~2"   & shift & shift & goto :parse_args )
-echo [WARN] Unknown argument: %~1
+>&2 echo [WARN] Unknown argument: %~1
 shift & goto :parse_args
 :done_args
 
@@ -49,11 +49,6 @@ set "MCP_DEVICE_CONFIG=!CONFIG_PATH!"
 set "MCP_AUDIT_LOG=!AUDIT_LOG!"
 set "MCP_TRANSPORT=!TRANSPORT!"
 
-echo MCP_DEVICE_CONFIG=!MCP_DEVICE_CONFIG!
-echo MCP_AUDIT_LOG=!MCP_AUDIT_LOG!
-echo MCP_TRANSPORT=!MCP_TRANSPORT!
-echo PYTHON_EXE=!PYTHON_EXE!
-
 :: ── PYTHONPATH (src layout support) ─────────────────────────────
 if exist "%~dp0src" (
     if defined PYTHONPATH (
@@ -61,19 +56,14 @@ if exist "%~dp0src" (
     ) else (
         set "PYTHONPATH=%~dp0src"
     )
-    echo PYTHONPATH=!PYTHONPATH!
 )
 
 :: ── dependency check ────────────────────────────────────────────
-"!PYTHON_EXE!" -c "import importlib.util,sys;mods=('mcp','paramiko','yaml');missing=[m for m in mods if importlib.util.find_spec(m) is None];print(','.join(missing));sys.exit(1 if missing else 0)"
+"!PYTHON_EXE!" -c "import importlib.util,sys;mods=('mcp','paramiko','yaml');missing=[m for m in mods if importlib.util.find_spec(m) is None];sys.exit(1 if missing else 0)" >nul 2>nul
 if %ERRORLEVEL% neq 0 (
-    echo [WARN] Missing dependencies detected. Running: pip install -e .
-    "!PYTHON_EXE!" -m pip install -e .
-    if %ERRORLEVEL% neq 0 (
-        echo [ERROR] Dependency installation failed.
-        echo         Run "!PYTHON_EXE! -m pip install -e ." and retry.
-        exit /b 1
-    )
+    >&2 echo [ERROR] Missing dependencies for mcp-device-gateway.
+    >&2 echo [ERROR] Please run: "!PYTHON_EXE!" -m pip install -e .
+    exit /b 1
 )
 
 :: ── launch server ───────────────────────────────────────────────

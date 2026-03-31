@@ -46,6 +46,7 @@ class CommandTemplate:
     args: tuple[str, ...] = ()
     examples: tuple[tuple[str, ...], ...] = ()
     risk: str = "medium"
+    exec_mode: str = "sync"
     category: str = "legacy"
     device_name: str | None = None
 
@@ -150,6 +151,10 @@ def _to_command_template(
     if risk not in {"low", "medium", "high"}:
         raise ValueError(f"Template '{key}' risk must be one of low/medium/high.")
 
+    exec_mode = str(raw_map.get("exec_mode", "sync")).strip().lower() or "sync"
+    if exec_mode not in {"sync", "async"}:
+        raise ValueError(f"Template '{key}' exec_mode must be 'sync' or 'async'.")
+
     args_value: Any = raw_map.get("args", [])
     if args_value is None:
         args_value = []
@@ -202,6 +207,7 @@ def _to_command_template(
         args=arg_names,
         examples=tuple(parsed_examples),
         risk=risk,
+        exec_mode=exec_mode,
         category=category,
         device_name=device_name,
     )

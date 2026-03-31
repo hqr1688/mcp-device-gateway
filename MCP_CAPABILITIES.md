@@ -1,84 +1,102 @@
 # MCP 能力总览（mcp-device-gateway）
 
-## 1. 服务目标与边界
+## 服务边界
 
-### 1.1 目标
+- 仅执行配置中声明的命令模板，不暴露任意 shell
+- 所有命令参数都通过 `^[a-zA-Z0-9_./:=+\-]+$` 正则校验
+- 远端文件操作受 `allowed_roots` 白名单约束
+- 配置不可用时服务保持运行，但拒绝业务工具调用
+- 每次调用都会写入 JSONL 审计日志
 
-本服务为 Agent 提供受控的远端设备操作能力，核心目标是：
+## 能力清单
 
-- 在白名单边界内执行设备命令与文件传输
-- 通过命令模板与参数校验降低注入风险
-- 通过审计日志实现调用可追溯
-- 让 Agent 能“先发现能力，再安全执行”
+当前服务提供：
 
-### 1.2 边界
+- 15 个 MCP 工具
+- 1 个资源：`config://summary`
+- 1 个提示模板：`device_ops_prompt(task, device_name?)`
 
-- 不提供任意 shell 能力，仅能执行 `command_templates` 中定义的模板
-- 文件读写受 `allowed_roots` 白名单约束
-- 参数默认按正则 `^[a-zA-Z0-9_./:\=+\-]+$` 校验
-- 配置不可用时服务不退出，但拒绝业务工具调用
-
-## 2. 工具能力与使用方式
-
-### 2.1 发现类工具（推荐先用）
-
-1. `capability_overview`
-用途：获取能力地图、工具用途、推荐流程。
-何时用：首次接入、任务中途不确定下一步。
-
-2. `command_template_list`
-用途：列出所有命令模板的描述、参数、示例、风险。
-何时用：不确定 `command_key` 时。
-
-3. `command_template_get`
-用途：查看单个模板详细信息。
-何时用：已锁定 `command_key`，需要确认参数与示例。
-
-4. `task_recommend`
-用途：输入自然语言任务，返回推荐 `tool + command_key + 参数草案`。
-何时用：知道目标但不清楚工具调用细节。
-
-5. `device_profile_get`
-用途：查看指定设备画像（用途、能力标签、推荐模板）。
-何时用：存在多个设备，需要先选最合适目标时。
-
-### 2.2 执行类工具
+### 发现与规划工具
 
 1. `device_list`
-用途：列出设备，作为后续调用的设备来源。
+用途：列出全部设备。
+何时用：任何设备操作前的第一步。
 
-2. `device_ping`
-用途：验证设备连通性。
+2. `device_profile_get`
+用途：查看设备画像、能力标签、推荐模板。
+何时用：需要从多个设备中选目标时。
 
-3. `cmd_exec`
-用途：按模板执行命令。
-前置：建议先 `command_template_list/get`。
+3. `device_ping`
+用途：验证设备 SSH 可达性。
+何时用：执行命令或文件传输前。
 
-4. `file_upload`
+4. `command_template_list`
+用途：列出全部命令模板、参数、风险和执行模式。
+何时用：不确定 `command_key` 时。
+
+5. `command_template_get`
+用途：查看单个模板详情。
+何时用：已锁定模板，需确认 `exec_mode`、参数和风险时。
+
+6. `capability_overview`
+用途：返回能力地图与推荐工作流。
+何时用：首次接入或执行过程中不确定下一步时。
+
+7. `task_recommend`
+用途：根据自然语言任务返回推荐工具与参数草案。
+何时用：知道想做什么，但不确定要调哪些工具时。
+
+### 命令执行工具
+
+1. `cmd_exec`
+用途：执行单条同步命令。
+何时用：模板 `exec_mode=sync`，并且需要立即拿到结果时。
+
+2. `cmd_exec_batch`
+用途：并发执行多条独立同步命令。
+何时用：一次采集多项指标或多条互不依赖的短命令时。
+
+3. `cmd_exec_async`
+用途：提交长耗时异步命令，立即返回 `job_id`。
+何时用：模板 `exec_mode=async` 时。
+
+4. `cmd_exec_result`
+用途：查询异步任务执行状态和结果。
+何时用：调用 `cmd_exec_async` 之后轮询结果时。
+
+### 文件与目录工具
+
+1. `dir_list`
+用途：列出远端目录内容。
+何时用：确认目录结构、文件是否存在、文件大小时。
+
+2. `file_stat`
+用途：查看远端文件或目录元信息。
+何时用：下载前确认目标是否存在以及大小、时间等属性。
+
+3. `file_upload`
 用途：上传本地文件到设备。
+何时用：下发构建产物、脚本或配置时。
 
-5. `file_download`
-用途：下载设备文件到本地。
+4. `file_download`
+用途：从设备下载文件到本地。
+何时用：回收日志、导出配置或拉取调试产物时。
 
-## 3. 推荐工作流
+## 推荐工作流
 
-1. 调用 `capability_overview` 获取当前能力地图
-1. 调用 `device_list` 选择目标设备
-1. 调用 `device_ping` 验证可达性
-1. 命令执行场景：
+1. 调用 `device_list` 选择目标设备。
+2. 必要时调用 `device_profile_get`，确认该设备是否适合当前任务。
+3. 调用 `device_ping` 验证连通性。
+4. 命令类任务先调用 `task_recommend` 或 `command_template_list`。
+5. 使用 `command_template_get` 查看模板详情，重点确认 `exec_mode`。
+6. `exec_mode=sync` 时用 `cmd_exec`，多条短命令用 `cmd_exec_batch`。
+7. `exec_mode=async` 时用 `cmd_exec_async`，然后用 `cmd_exec_result` 轮询。
+8. 文件类任务使用 `dir_list`、`file_stat`、`file_upload`、`file_download`。
 
-- 优先 `task_recommend` 或 `command_template_list`
-- 必要时 `command_template_get`
-- 最后 `cmd_exec`
-
-1. 文件传输场景：
-
-- `file_upload` 或 `file_download`
-
-## 4. 常见错误码与处理建议
+## 常见错误码
 
 1. `CONFIG_UNAVAILABLE`
-含义：配置文件不可用或格式错误。
+含义：配置文件不存在、格式错误或当前不可加载。
 建议：修复配置文件并保存，等待自动重载。
 
 2. `UNKNOWN_DEVICE`
@@ -89,85 +107,39 @@
 含义：命令模板不存在。
 建议：先调用 `command_template_list` 或 `command_template_get`。
 
-4. `INVALID_COMMAND_ARGS`
-含义：传入参数与模板占位符不匹配。
-建议：检查模板 `arg_count` / `args` / `examples`。
+4. `TEMPLATE_NOT_APPLICABLE`
+含义：模板与设备或 `os_family` 不匹配。
+建议：检查模板分组、设备归属和 `os_family`。
 
-5. `LOCAL_FILE_NOT_FOUND`
+5. `INVALID_COMMAND_ARGS`
+含义：传入参数与模板占位符数量不匹配，或参数不满足安全校验。
+建议：检查 `args`、`examples` 与参数内容。
+
+6. `LOCAL_FILE_NOT_FOUND`
 含义：上传时本地文件不存在。
-建议：确认路径与文件权限。
+建议：确认本地路径和文件权限。
 
-6. `REMOTE_PATH_NOT_ALLOWED`
-含义：远端路径不在白名单中。
-建议：调整到 `allowed_roots` 内路径，或更新配置。
+7. `REMOTE_PATH_NOT_ALLOWED`
+含义：远端路径不在白名单内。
+建议：改用 `allowed_roots` 范围内路径，或更新配置。
 
-## 5. 模板编写规范（结构化 command_templates）
+8. `UNKNOWN_JOB`
+含义：异步任务 ID 不存在或已被清理。
+建议：确认 `job_id` 是否来自当前服务实例。
 
-支持两种写法：
+## 配置建议
 
-1. 简写：
+### devices
 
-```yaml
-command_templates:
-  health_check: "uname -a; uptime"
-```
+- 每个设备都应提供 `host` 和 `username`
+- 建议补齐 `description`、`when_to_use`、`capabilities`、`tags`、`preferred_templates`
+- 生产环境优先使用 `key_file + known_hosts`，避免明文密码和弱主机校验
+- `allowed_roots` 尽量最小化，空列表仅用于可信环境
 
-1. 结构化（推荐）：
+### command_templates
 
-```yaml
-command_templates:
-  list_dir:
-    template: "ls -al {0}"
-    description: "列出指定目录"
-    when_to_use: "需要检查目录内容"
-    args: ["path"]
-    examples:
-      - ["/opt/idm"]
-      - ["/tmp"]
-    risk: "low"
-```
-
-字段说明：
-
-- `template`：命令模板，支持 `{0}`、`{1}` 占位符
-- `description`：简短功能说明
-- `when_to_use`：推荐使用场景
-- `args`：参数名列表（按位置）
-- `examples`：参数示例二维数组，供 Agent 生成参数草案
-- `risk`：`low`/`medium`/`high`
-
-建议：
-
-1. 每个模板至少提供 `description` 与 `when_to_use`
-2. 含占位符模板必须给 `args`，并提供至少一个 `examples`
-3. 高风险命令（重启、删除、覆盖）明确标记 `risk: high`
-
-## 6. 设备画像编写规范（devices）
-
-建议为每个设备补齐以下字段，提升 Agent 选型准确率：
-
-- `description`：一句话说明设备职责
-- `when_to_use`：典型任务场景
-- `capabilities`：能力标签列表（如 `shell-command`、`file-transfer`）
-- `tags`：环境或平台标签（如 `dev`、`prod`、`arm64`）
-- `preferred_templates`：该设备优先使用的命令模板 key
-- `os_family`：系统家族（`linux`/`windows`，默认 `linux`）
-- `os_name`：系统名称（如 Ubuntu、Windows Server）
-- `os_version`：系统版本（如 22.04、2019）
-
-示例：
-
-```yaml
-devices:
-  devkit-01:
-    host: 192.168.200.218
-    username: root
-    os_family: "linux"
-    os_name: "Ubuntu"
-    os_version: "22.04"
-    description: "开发验证板卡"
-    when_to_use: "联调与日志排障"
-    capabilities: ["shell-command", "file-transfer", "log-inspection"]
-    tags: ["dev", "arm64"]
-    preferred_templates: ["linux_common.health_check", "device_specific.devkit-01.idm_status"]
-```
+- 推荐使用分组结构：`windows_common`、`linux_common`、`device_specific`
+- 含占位符的模板应补齐 `args` 和 `examples`
+- 高风险操作明确标记 `risk`
+- 秒级命令使用 `exec_mode: sync`
+- 编译、部署、重启等长任务使用 `exec_mode: async`

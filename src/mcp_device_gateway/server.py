@@ -3,16 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import socket
 import sys
 import time
-import re
-from threading import Lock
-from threading import Thread
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock, Thread
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
+import paramiko
 import yaml
 
 from .config import AppConfig, CommandTemplate, DeviceConfig, load_config
@@ -27,6 +30,12 @@ _CONFIG_STATE: dict[str, Any] = {
     "last_error": None,
     "available": False,
 }
+
+# 异步任务存储：job_id -> 任务状态字典
+_JOBS_LOCK = Lock()
+_JOBS: dict[str, dict[str, Any]] = {}
+_JOBS_MAX = 200  # 最多保留任务数，超出时清理已完成任务
+_EXEC_OPERATION_ERRORS = (paramiko.SSHException, socket.error, EOFError)
 
 _DEFAULT_CONFIG_TEMPLATE = """# mcp-device-gateway 自动生成配置模板（请按实际环境修改）
 # 说明：当前模板故意保持 devices 为空，服务会拒绝业务工具调用，直到你补齐至少一个设备。
@@ -132,7 +141,9 @@ def _get_app_config() -> AppConfig:
 
 
 def _audit(tool: str, payload: dict[str, Any]) -> None:
-    log_path = Path(_get_app_config().audit_log)
+    # audit_log 路径由 MCP_AUDIT_LOG 环境变量决定，与 AppConfig 无关，
+    # 直接读取以避免配置不可用时 _get_app_config() 抛出异常掩盖已完成的操作。
+    log_path = Path(os.getenv("MCP_AUDIT_LOG", "./mcp_audit.log"))
     line: dict[str, Any] = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "tool": tool,
@@ -168,6 +179,7 @@ def _serialize_template(key: str, item: CommandTemplate) -> dict[str, Any]:
         "examples": [list(e) for e in item.examples],
         "arg_count": _template_arg_count(item.template),
         "risk": item.risk,
+        "exec_mode": item.exec_mode,
         "category": item.category,
         "device_name": item.device_name,
     }
@@ -226,6 +238,76 @@ def _score_template(task_text: str, key: str, item: CommandTemplate) -> int:
     return score
 
 
+_CAPABILITY_TOOLS: list[dict[str, str]] = [
+    {"name": "capability_overview", "when": "首次接入时查看服务能力地图、自检结果与推荐工作流"},
+    {"name": "device_list", "when": "获取设备清单"},
+    {"name": "device_profile_get", "when": "查看设备能力画像"},
+    {"name": "device_ping", "when": "执行前连通性检查"},
+    {"name": "command_template_list", "when": "发现可执行命令模板"},
+    {"name": "command_template_get", "when": "查看命令模板详情（含 exec_mode 字段）"},
+    {"name": "task_recommend", "when": "根据自然语言任务生成工具调用建议（自动选择执行模式）"},
+    {"name": "cmd_exec", "when": "同步执行单条命令（exec_mode==sync）"},
+    {"name": "cmd_exec_batch", "when": "并发执行多条无依赖同步命令（exec_mode==sync）"},
+    {"name": "cmd_exec_async", "when": "异步提交长耗时命令（exec_mode==async），立即返回 job_id"},
+    {"name": "cmd_exec_result", "when": "取回 cmd_exec_async 的执行结果，status=done 时获得完整输出"},
+    {"name": "dir_list", "when": "列出远端目录内容"},
+    {"name": "file_stat", "when": "查询远端文件或目录的元信息"},
+    {"name": "file_upload", "when": "上传本地文件到设备"},
+    {"name": "file_download", "when": "下载设备文件到本地"},
+]
+
+_CAPABILITY_RESOURCES: list[dict[str, str]] = [
+    {"name": "config://summary", "when": "读取当前配置摘要，包括设备数、模板数、已加载设备与模板键"},
+]
+
+_CAPABILITY_PROMPTS: list[dict[str, str]] = [
+    {"name": "device_ops_prompt", "when": "根据任务和设备生成推荐调用顺序与工具选择提示"},
+]
+
+
+@mcp.resource("config://summary")
+def config_summary_resource() -> dict[str, Any]:
+    """读取网关配置摘要资源。"""
+    app_config = _get_app_config()
+    devices = sorted(app_config.devices.keys())
+    templates = sorted(app_config.command_templates.keys())
+    data: dict[str, Any] = {
+        "service": "embedded-device-gateway",
+        "config_path": str(Path(os.getenv("MCP_DEVICE_CONFIG", "./devices.example.yaml")).resolve()),
+        "device_count": len(devices),
+        "template_count": len(templates),
+        "devices": devices,
+        "templates": templates,
+    }
+    _audit("resource.config.summary", {"device_count": len(devices), "template_count": len(templates)})
+    return data
+
+
+@mcp.prompt()
+def device_ops_prompt(task: str, device_name: str | None = None) -> str:
+    """生成设备操作建议提示模板。"""
+    app_config = _get_app_config()
+    known_devices = sorted(app_config.devices.keys())
+    target_device = device_name or "<请先调用 device_list 选择设备>"
+    prompt_text = (
+        "你是嵌入式设备运维助手。请按以下顺序执行：\n"
+        "1. 先调用 device_list 确认可用设备。\n"
+        "2. 若用户指定设备，再调用 device_profile_get 查看能力与推荐模板。\n"
+        "3. 执行前先调用 device_ping 做连通性检查。\n"
+        "4. 根据任务内容优先调用 task_recommend 与 command_template_list 选模板。\n"
+        "5. 执行命令时必须按 3 种模式选择工具：\n"
+        "   - sync（单条同步）：使用 cmd_exec，适合秒级命令并立即读取结果。\n"
+        "   - batch（多条并发同步）：使用 cmd_exec_batch，适合多条互不依赖的短命令。\n"
+        "   - async（长任务异步）：先用 cmd_exec_async 提交，再用 cmd_exec_result 轮询到 done/error。\n"
+        "6. 文件传输场景使用 file_upload/file_download，并在返回中包含风险说明与下一步建议。\n\n"
+        f"用户任务：{task}\n"
+        f"目标设备：{target_device}\n"
+        f"当前已知设备：{', '.join(known_devices) if known_devices else '（无）'}"
+    )
+    _audit("prompt.device.ops", {"task": task, "device_name": device_name or ""})
+    return prompt_text
+
+
 @mcp.tool()
 def device_list() -> list[dict[str, Any]]:
     """列出所有设备。
@@ -261,7 +343,8 @@ def device_ping(device_name: str) -> dict[str, Any]:
     - 执行 cmd_exec/file_upload/file_download 前做预检查。
     """
     cfg = _get_device(device_name)
-    client = SshDeviceClient(cfg)
+    # ping 使用独立连接，不污染连接池
+    client = SshDeviceClient(cfg, use_pool=False)
     ok = client.ping()
 
     result: dict[str, Any] = {"device": device_name, "reachable": ok}
@@ -326,26 +409,45 @@ def capability_overview() -> dict[str, Any]:
         "config_available": True,
         "device_count": len(app_config.devices),
         "template_count": len(app_config.command_templates),
+        "tool_count": len(_CAPABILITY_TOOLS),
+        "resource_count": len(_CAPABILITY_RESOURCES),
+        "prompt_count": len(_CAPABILITY_PROMPTS),
         "workflow": [
             "先调用 device_list 获取设备",
             "必要时调用 device_profile_get 查看设备画像与推荐模板",
             "调用 device_ping 验证连通性",
             "调用 command_template_list 或 command_template_get 选择命令",
             "如只知道自然语言任务，可先调用 task_recommend 生成调用草案",
-            "调用 cmd_exec 执行远端命令",
+            "调用 cmd_exec 执行远端命令（同步阻塞）",
+            "长耗时命令用 cmd_exec_async 异步提交，再用 cmd_exec_result 轮询结果",
+            "批量并发执行多条无依赖命令时使用 cmd_exec_batch",
+            "需要浏览目录时使用 dir_list；查询单个文件属性使用 file_stat",
             "需要传输文件时使用 file_upload/file_download",
         ],
-        "tools": [
-            {"name": "device_list", "when": "获取设备清单"},
-            {"name": "device_profile_get", "when": "查看设备能力画像"},
-            {"name": "device_ping", "when": "执行前连通性检查"},
-            {"name": "command_template_list", "when": "发现可执行命令模板"},
-            {"name": "command_template_get", "when": "查看命令模板详情"},
-            {"name": "task_recommend", "when": "根据自然语言任务生成工具调用建议"},
-            {"name": "cmd_exec", "when": "执行命令模板"},
-            {"name": "file_upload", "when": "上传本地文件到设备"},
-            {"name": "file_download", "when": "下载设备文件到本地"},
-        ],
+        "exec_mode_guide": {
+            "decision_rule": "执行任何命令前，先调用 command_template_get 查看模板的 exec_mode 字段，再按下表选择工具。",
+            "modes": [
+                {
+                    "exec_mode": "sync",
+                    "characteristics": "命令秒级完成，需立即取回结果",
+                    "single_command": "cmd_exec",
+                    "multiple_independent_commands": "cmd_exec_batch（并发执行，一次取回全部结果）",
+                    "do_not_use": "cmd_exec_async（不必要的异步开销）",
+                    "typical_examples": ["查看进程", "读取日志最后几行", "health_check", "查磁盘"],
+                },
+                {
+                    "exec_mode": "async",
+                    "characteristics": "命令耗时长（数秒至数分钟），不应阻塞 Agent 主流程",
+                    "tool_sequence": ["cmd_exec_async → 立即得到 job_id", "cmd_exec_result(job_id) → 轮询直到 status!=running"],
+                    "do_not_use": "cmd_exec / cmd_exec_batch（会长时间阻塞，可能超时）",
+                    "typical_examples": ["run_idm（nohup 重启进程）", "vm_make（编译）", "vm_deploy（scp 传输）"],
+                },
+            ],
+            "shortcut": "如只有自然语言任务描述，调用 task_recommend —— 它会自动读取 exec_mode 并在 recommended_tool 字段直接告知应使用哪个工具。",
+        },
+        "tools": [dict(item) for item in _CAPABILITY_TOOLS],
+        "resources": [dict(item) for item in _CAPABILITY_RESOURCES],
+        "prompts": [dict(item) for item in _CAPABILITY_PROMPTS],
     }
     _audit("capability.overview", {"device_count": len(app_config.devices), "template_count": len(app_config.command_templates)})
     return data
@@ -420,21 +522,28 @@ def task_recommend(task: str) -> dict[str, Any]:
                 suggested_device = device.name
                 break
 
+        use_async = best_item.exec_mode == "async"
+        recommended_tool = "cmd_exec_async" if use_async else "cmd_exec"
+        draft: dict[str, Any] = {
+            "device_name": suggested_device or "<device_name>",
+            "command_key": best_key,
+            "args": _guess_cmd_args(best_item),
+            "timeout_sec": 30,
+        }
+        next_steps = ["device_list", "device_profile_get", "device_ping", "command_template_get", recommended_tool]
+        if use_async:
+            next_steps.append("cmd_exec_result")
+
         result: dict[str, Any] = {
             "task": task,
-            "recommended_tool": "cmd_exec",
-            "draft": {
-                "device_name": suggested_device or "<device_name>",
-                "command_key": best_key,
-                "args": _guess_cmd_args(best_item),
-                "timeout_sec": 30,
-            },
+            "recommended_tool": recommended_tool,
+            "draft": draft,
             "matched_template": _serialize_template(best_key, best_item),
             "suggested_device": suggested_device or None,
-            "reason": "根据模板关键词和用途说明匹配得到。",
-            "next_steps": ["device_list", "device_profile_get", "device_ping", "command_template_get", "cmd_exec"],
+            "reason": f"根据模板关键词和用途说明匹配得到（exec_mode={best_item.exec_mode}）。",
+            "next_steps": next_steps,
         }
-        _audit("task.recommend", {"tool": "cmd_exec", "command_key": best_key})
+        _audit("task.recommend", {"tool": recommended_tool, "command_key": best_key})
         return result
 
     result: dict[str, Any] = {
@@ -450,11 +559,15 @@ def task_recommend(task: str) -> dict[str, Any]:
 
 @mcp.tool()
 def cmd_exec(device_name: str, command_key: str, args: list[str] | None = None, timeout_sec: int = 30) -> dict[str, Any]:
-    """执行命令模板。
+    """执行单条命令模板（同步阻塞）。
 
     何时使用：
-    - 已通过 device_list/device_ping 确认目标设备。
-    - 已通过 command_template_list 或 command_template_get 确认 command_key 与参数。
+    - 模板的 exec_mode == "sync"，且只需执行一条命令时。
+    - 需要立即取回 stdout/stderr/exit_code 时。
+
+    何时不用：
+    - 模板的 exec_mode == "async" → 改用 cmd_exec_async（否则可能阻塞超时）。
+    - 需要并发执行多条独立命令 → 改用 cmd_exec_batch（更高效）。
     """
     cfg = _get_device(device_name)
     template_item = _get_app_config().command_templates.get(command_key)
@@ -482,7 +595,7 @@ def cmd_exec(device_name: str, command_key: str, args: list[str] | None = None, 
     except IndexError as exc:
         raise ValueError("INVALID_COMMAND_ARGS: Command args do not match template placeholders.") from exc
 
-    with SshDeviceClient(cfg) as client:
+    with SshDeviceClient(cfg, use_pool=True) as client:
         result = client.exec(command, timeout_sec=timeout_sec)
 
     payload: dict[str, Any] = {
@@ -515,7 +628,7 @@ def file_upload(device_name: str, local_path: str, remote_path: str) -> dict[str
     if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
         raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
 
-    with SshDeviceClient(cfg) as client:
+    with SshDeviceClient(cfg, use_pool=True) as client:
         client.upload(str(lp), remote_path)
 
     payload: dict[str, Any] = {"device": device_name, "local_path": str(lp), "remote_path": remote_path}
@@ -539,7 +652,7 @@ def file_download(device_name: str, remote_path: str, local_path: str) -> dict[s
     if lp.parent:
         lp.parent.mkdir(parents=True, exist_ok=True)
 
-    with SshDeviceClient(cfg) as client:
+    with SshDeviceClient(cfg, use_pool=True) as client:
         client.download(remote_path, str(lp))
 
     payload: dict[str, Any] = {"device": device_name, "remote_path": remote_path, "local_path": str(lp)}
@@ -547,7 +660,265 @@ def file_download(device_name: str, remote_path: str, local_path: str) -> dict[s
     return {"ok": True, **payload}
 
 
+@mcp.tool()
+def dir_list(device_name: str, remote_path: str) -> dict[str, Any]:
+    """列出远端目录内容（文件名、类型、大小、修改时间、权限）。
+
+    何时使用：
+    - 需要查看设备目录结构时。
+    - 确认文件是否存在及其大小时。
+    """
+    cfg = _get_device(device_name)
+
+    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
+        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+
+    with SshDeviceClient(cfg, use_pool=True) as client:
+        entries = client.listdir(remote_path)
+
+    payload: dict[str, Any] = {"device": device_name, "remote_path": remote_path, "count": len(entries)}
+    _audit("dir.list", payload)
+    return {"device": device_name, "path": remote_path, "count": len(entries), "entries": entries}
+
+
+@mcp.tool()
+def file_stat(device_name: str, remote_path: str) -> dict[str, Any]:
+    """查询远端文件或目录的元信息（类型、大小、修改时间、权限）。
+
+    何时使用：
+    - 需要确认文件是否存在及其属性时。
+    - 下载前验证文件大小时。
+    """
+    cfg = _get_device(device_name)
+
+    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
+        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+
+    with SshDeviceClient(cfg, use_pool=True) as client:
+        info = client.stat(remote_path)
+
+    _audit("file.stat", {"device": device_name, "remote_path": remote_path})
+    return {"device": device_name, **info}
+
+
+@mcp.tool()
+def cmd_exec_batch(
+    device_name: str,
+    commands: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """并发执行多条命令模板，一次返回全部结果（顺序与输入一致）。
+
+    commands 格式：
+      [{"command_key": "...", "args": [...], "timeout_sec": 30}, ...]
+
+    何时使用：
+    - 所有命令的 exec_mode == "sync"，且它们互相无依赖时。
+    - 需要同时采集多个指标（CPU、内存、磁盘、网络等）时。
+
+    何时不用：
+    - commands 中包含 exec_mode == "async" 的模板 → 每条改用 cmd_exec_async 单独提交。
+    - 命令之间存在依赖顺序 → 改用多次 cmd_exec 串行调用。
+    """
+    cfg = _get_device(device_name)
+    app_config = _get_app_config()
+
+    # 预先校验并构建命令字符串列表
+    prepared: list[tuple[str, str, int]] = []  # (command_key, command_str, timeout_sec)
+    device_os_family = cfg.os_family or "linux"
+    for item in commands:
+        command_key = str(item.get("command_key", ""))
+        raw_args: Any = item.get("args") or []
+        timeout_sec = int(item.get("timeout_sec", 30))
+
+        template_item = app_config.command_templates.get(command_key)
+        if not template_item:
+            raise ValueError(f"UNKNOWN_COMMAND_TEMPLATE: '{command_key}'")
+
+        if template_item.category == "device_specific" and template_item.device_name != device_name:
+            raise ValueError(
+                f"TEMPLATE_NOT_APPLICABLE: Template '{command_key}' is only for device '{template_item.device_name}'."
+            )
+        if template_item.category == "windows_common" and device_os_family != "windows":
+            raise ValueError(
+                f"TEMPLATE_NOT_APPLICABLE: Template '{command_key}' requires windows device, but '{device_name}' is '{device_os_family}'."
+            )
+        if template_item.category == "linux_common" and device_os_family != "linux":
+            raise ValueError(
+                f"TEMPLATE_NOT_APPLICABLE: Template '{command_key}' requires linux device, but '{device_name}' is '{device_os_family}'."
+            )
+
+        safe_args = sanitize_args(list(raw_args))
+        try:
+            command_str = template_item.template.format(*safe_args)
+        except IndexError as exc:
+            raise ValueError(f"INVALID_COMMAND_ARGS for '{command_key}'") from exc
+
+        prepared.append((command_key, command_str, timeout_sec))
+
+    def _run_one(label: str, cmd: str, timeout: int) -> dict[str, Any]:
+        try:
+            with SshDeviceClient(cfg, use_pool=True) as client:
+                result = client.exec(cmd, timeout_sec=timeout)
+                return {
+                    "command_key": label,
+                    "exit_code": result.exit_code,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "elapsed_ms": result.elapsed_ms,
+                }
+        except _EXEC_OPERATION_ERRORS as exc:
+            return {"command_key": label, "error": str(exc)}
+
+    results: list[dict[str, Any]] = [{}] * len(prepared)
+    max_workers = min(len(prepared), 8)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {executor.submit(_run_one, *p): i for i, p in enumerate(prepared)}
+        for future in as_completed(future_to_idx):
+            results[future_to_idx[future]] = future.result()
+
+    _audit("cmd.exec.batch", {"device": device_name, "count": len(prepared)})
+    return results
+
+
+def _jobs_cleanup_if_needed() -> None:
+    """当任务数超过上限时，清理最旧的已完成任务（在 _JOBS_LOCK 内调用）。"""
+    if len(_JOBS) < _JOBS_MAX:
+        return
+    done_keys = [
+        k for k, v in _JOBS.items() if v.get("status") in ("done", "error")
+    ]
+    for k in done_keys[: len(done_keys) // 2 + 1]:
+        _JOBS.pop(k, None)
+
+
+def _reconfigure_stream_utf8(stream: Any) -> None:
+    """尽量将文本流切换为 UTF-8，失败时保持原状。"""
+    if not stream or not hasattr(stream, "reconfigure"):
+        return
+
+    try:
+        stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    except (LookupError, OSError, ValueError):
+        return
+
+
+@mcp.tool()
+def cmd_exec_async(
+    device_name: str,
+    command_key: str,
+    args: list[str] | None = None,
+    timeout_sec: int = 30,
+) -> dict[str, Any]:
+    """异步提交命令，立即返回 job_id，不阻塞等待结果。
+
+    执行流程：
+      1. cmd_exec_async(...)  → 返回 {job_id, status: "running"}
+      2. cmd_exec_result(job_id) → status=="running" 时稍后重试
+      3. cmd_exec_result(job_id) → status=="done" 时读取 stdout/stderr/exit_code
+
+    何时使用：
+    - 模板的 exec_mode == "async" 时必须使用本工具。
+    - 命令耗时较长（固件烧录、编译、nohup 重启等），不应占用 Agent 主流程。
+    - 需要同时提交多个独立长任务时（各自得到 job_id，并行等待）。
+
+    何时不用：
+    - 模板的 exec_mode == "sync" → 直接用 cmd_exec（无需 job_id 轮询开销）。
+    """
+    cfg = _get_device(device_name)
+    app_config = _get_app_config()
+
+    template_item = app_config.command_templates.get(command_key)
+    if not template_item:
+        raise ValueError(f"UNKNOWN_COMMAND_TEMPLATE: '{command_key}'")
+
+    if template_item.category == "device_specific" and template_item.device_name != device_name:
+        raise ValueError(
+            f"TEMPLATE_NOT_APPLICABLE: Template '{command_key}' is only for device '{template_item.device_name}'."
+        )
+    device_os_family = cfg.os_family or "linux"
+    if template_item.category == "windows_common" and device_os_family != "windows":
+        raise ValueError(
+            f"TEMPLATE_NOT_APPLICABLE: Template '{command_key}' requires windows device, but '{device_name}' is '{device_os_family}'."
+        )
+    if template_item.category == "linux_common" and device_os_family != "linux":
+        raise ValueError(
+            f"TEMPLATE_NOT_APPLICABLE: Template '{command_key}' requires linux device, but '{device_name}' is '{device_os_family}'."
+        )
+
+    safe_args = sanitize_args(args or [])
+    try:
+        command = template_item.template.format(*safe_args)
+    except IndexError as exc:
+        raise ValueError("INVALID_COMMAND_ARGS: Command args do not match template placeholders.") from exc
+
+    job_id = uuid.uuid4().hex
+    submitted_at = datetime.now(timezone.utc).isoformat()
+
+    with _JOBS_LOCK:
+        _jobs_cleanup_if_needed()
+        _JOBS[job_id] = {
+            "status": "running",
+            "device": device_name,
+            "command_key": command_key,
+            "submitted_at": submitted_at,
+        }
+
+    def _worker() -> None:
+        update: dict[str, Any]
+        try:
+            with SshDeviceClient(cfg, use_pool=True) as client:
+                result = client.exec(command, timeout_sec=timeout_sec)
+            update = {
+                "status": "done",
+                "exit_code": result.exit_code,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "elapsed_ms": result.elapsed_ms,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }
+        except _EXEC_OPERATION_ERRORS as exc:
+            update = {
+                "status": "error",
+                "error": str(exc),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }
+        with _JOBS_LOCK:
+            if job_id in _JOBS:
+                _JOBS[job_id].update(update)
+
+    t = Thread(target=_worker, name=f"async-exec-{job_id[:8]}", daemon=True)
+    t.start()
+
+    _audit("cmd.exec.async", {"device": device_name, "command_key": command_key, "job_id": job_id})
+    return {"job_id": job_id, "status": "running", "submitted_at": submitted_at}
+
+
+@mcp.tool()
+def cmd_exec_result(job_id: str) -> dict[str, Any]:
+    """取回异步命令执行结果。
+
+    status 字段说明：
+    - "running"：命令仍在执行，建议等待 1-3 秒后重试。
+    - "done"：执行完成，返回值包含 exit_code / stdout / stderr / elapsed_ms。
+    - "error"：执行异常（SSH 断连等），返回值包含 error 字段。
+
+    何时使用：
+    - 调用 cmd_exec_async 后，用返回的 job_id 轮询直到 status != "running"。
+    - 拿到 status=="done" 后读取 exit_code 判断命令是否成功（0 = 成功）。
+    """
+    with _JOBS_LOCK:
+        job = _JOBS.get(job_id)
+        if job is None:
+            raise ValueError(f"UNKNOWN_JOB: Unknown job_id '{job_id}'.")
+        # 在锁内复制，避免 worker 线程 update() 与此处并发产生撕裂读
+        return dict(job)
+
+
 def main() -> None:
+    # Windows 下强制 stderr/stdout 使用 UTF-8，避免 VS Code 输出面板乱码。
+    _reconfigure_stream_utf8(sys.stderr)
+    _reconfigure_stream_utf8(sys.stdout)
+
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--config", dest="config_path")
     parser.add_argument("--audit", dest="audit_log")
