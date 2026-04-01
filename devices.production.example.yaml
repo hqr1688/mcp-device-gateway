@@ -71,6 +71,10 @@ devices:
     allowed_roots:
       - /opt/app/
       - /tmp/
+    # denied_paths 可进一步收敛敏感目录/文件，优先级高于 allowed_roots
+    denied_paths:
+      - /opt/app/.env
+      - /opt/app/secret/
 
   # ---------------------------------------------------------------------------
   # 多设备示例：为多个目标复用同一 known_hosts
@@ -105,6 +109,9 @@ devices:
       - /opt/app/
       - /var/log/app/
       - /tmp/
+    denied_paths:
+      - /opt/app/.env
+      - /opt/app/secret/
 
 
 # =============================================================================

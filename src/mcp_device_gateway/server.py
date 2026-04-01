@@ -19,7 +19,7 @@ import paramiko
 import yaml
 
 from .config import AppConfig, CommandTemplate, DeviceConfig, load_config
-from .security import is_path_allowed, sanitize_args
+from .security import is_path_allowed, is_path_denied, match_dangerous_command, match_sensitive_path, scan_command_for_sensitive_paths, sanitize_args
 from .ssh_client import SshDeviceClient
 
 mcp = FastMCP("embedded-device-gateway")
@@ -195,12 +195,37 @@ def _serialize_device(cfg: DeviceConfig) -> dict[str, Any]:
         "os_name": cfg.os_name,
         "os_version": cfg.os_version,
         "allowed_roots": list(cfg.allowed_roots),
+        "denied_paths": list(cfg.denied_paths),
         "description": cfg.description,
         "when_to_use": cfg.when_to_use,
         "capabilities": list(cfg.capabilities),
         "tags": list(cfg.tags),
         "preferred_templates": list(cfg.preferred_templates),
     }
+
+
+def _guard_remote_path(cfg: DeviceConfig, remote_path: str) -> None:
+    # 内置敏感路径始终拦截，优先级最高，不受任何配置覆盖。
+    sensitive_reason = match_sensitive_path(remote_path, cfg.os_family)
+    if sensitive_reason:
+        raise ValueError(f"SENSITIVE_PATH_BLOCKED: {sensitive_reason}。")
+
+    if cfg.denied_paths and is_path_denied(remote_path, cfg.denied_paths):
+        raise ValueError(f"REMOTE_PATH_DENIED: Remote path is denied: {remote_path}")
+
+    # 空 allowed_roots 表示不限制路径，此时仅应用 denied_paths 黑名单。
+    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
+        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+
+
+def _guard_command_safety(command: str, cfg: DeviceConfig) -> None:
+    reason = match_dangerous_command(command, cfg.os_family)
+    if reason:
+        raise ValueError(f"DANGEROUS_COMMAND_BLOCKED: {reason}。命令已被内置安全策略拦截。")
+
+    path_reason = scan_command_for_sensitive_paths(command, cfg.os_family, cfg.denied_paths)
+    if path_reason:
+        raise ValueError(f"SENSITIVE_PATH_BLOCKED: {path_reason}。命令已被内置安全策略拦截。")
 
 
 def _guess_cmd_args(item: CommandTemplate) -> list[str]:
@@ -595,6 +620,8 @@ def cmd_exec(device_name: str, command_key: str, args: list[str] | None = None, 
     except IndexError as exc:
         raise ValueError("INVALID_COMMAND_ARGS: Command args do not match template placeholders.") from exc
 
+    _guard_command_safety(command, cfg)
+
     with SshDeviceClient(cfg, use_pool=True) as client:
         result = client.exec(command, timeout_sec=timeout_sec)
 
@@ -625,8 +652,7 @@ def file_upload(device_name: str, local_path: str, remote_path: str) -> dict[str
     if not lp.exists() or not lp.is_file():
         raise ValueError(f"LOCAL_FILE_NOT_FOUND: Local file not found: {local_path}")
 
-    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
-        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+    _guard_remote_path(cfg, remote_path)
 
     with SshDeviceClient(cfg, use_pool=True) as client:
         client.upload(str(lp), remote_path)
@@ -645,8 +671,7 @@ def file_download(device_name: str, remote_path: str, local_path: str) -> dict[s
     """
     cfg = _get_device(device_name)
 
-    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
-        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+    _guard_remote_path(cfg, remote_path)
 
     lp = Path(local_path)
     if lp.parent:
@@ -670,8 +695,7 @@ def dir_list(device_name: str, remote_path: str) -> dict[str, Any]:
     """
     cfg = _get_device(device_name)
 
-    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
-        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+    _guard_remote_path(cfg, remote_path)
 
     with SshDeviceClient(cfg, use_pool=True) as client:
         entries = client.listdir(remote_path)
@@ -691,8 +715,7 @@ def file_stat(device_name: str, remote_path: str) -> dict[str, Any]:
     """
     cfg = _get_device(device_name)
 
-    if cfg.allowed_roots and not is_path_allowed(remote_path, cfg.allowed_roots):
-        raise ValueError(f"REMOTE_PATH_NOT_ALLOWED: Remote path is not allowed: {remote_path}")
+    _guard_remote_path(cfg, remote_path)
 
     with SshDeviceClient(cfg, use_pool=True) as client:
         info = client.stat(remote_path)
@@ -752,6 +775,8 @@ def cmd_exec_batch(
             command_str = template_item.template.format(*safe_args)
         except IndexError as exc:
             raise ValueError(f"INVALID_COMMAND_ARGS for '{command_key}'") from exc
+
+        _guard_command_safety(command_str, cfg)
 
         prepared.append((command_key, command_str, timeout_sec))
 
@@ -850,6 +875,8 @@ def cmd_exec_async(
         command = template_item.template.format(*safe_args)
     except IndexError as exc:
         raise ValueError("INVALID_COMMAND_ARGS: Command args do not match template placeholders.") from exc
+
+    _guard_command_safety(command, cfg)
 
     job_id = uuid.uuid4().hex
     submitted_at = datetime.now(timezone.utc).isoformat()

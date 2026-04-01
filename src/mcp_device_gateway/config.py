@@ -19,6 +19,7 @@ class DeviceConfig:
     password: str | None = None
     known_hosts: str | None = None
     allowed_roots: tuple[str, ...] = ()
+    denied_paths: tuple[str, ...] = ()
     description: str = ""
     when_to_use: str = ""
     capabilities: tuple[str, ...] = ()
@@ -72,6 +73,11 @@ def _to_device(name: str, raw: dict[str, Any]) -> DeviceConfig:
         raise ValueError(f"Device '{name}' allowed_roots must be a list.")
     allowed_roots_list = cast(list[Any], allowed_roots)
 
+    denied_paths: Any = raw.get("denied_paths") or []
+    if not isinstance(denied_paths, list):
+        raise ValueError(f"Device '{name}' denied_paths must be a list.")
+    denied_paths_list = cast(list[Any], denied_paths)
+
     capabilities_value: Any = raw.get("capabilities") or []
     if not isinstance(capabilities_value, list):
         raise ValueError(f"Device '{name}' capabilities must be a list.")
@@ -101,6 +107,7 @@ def _to_device(name: str, raw: dict[str, Any]) -> DeviceConfig:
         password=str(raw["password"]) if raw.get("password") else None,
         known_hosts=str(raw["known_hosts"]) if raw.get("known_hosts") else None,
         allowed_roots=tuple(str(p) for p in allowed_roots_list),
+        denied_paths=tuple(str(p) for p in denied_paths_list),
         description=str(raw.get("description", "")).strip(),
         when_to_use=str(raw.get("when_to_use", "")).strip(),
         capabilities=tuple(str(item).strip() for item in capabilities_list if str(item).strip()),

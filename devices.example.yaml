@@ -28,6 +28,10 @@ devices:
       - /opt/app/
       - /var/log/app/
       - /tmp/
+    denied_paths:
+      - /opt/app/.env
+      - /opt/app/secret/
+      - /var/log/app/archive/
 
 command_templates:
   linux_common:

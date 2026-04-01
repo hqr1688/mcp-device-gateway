@@ -20,7 +20,7 @@
 - 模板执行：按命令模板执行同步命令、批量并发命令、异步长任务
 - 文件操作：上传、下载、列目录、查询远端文件元信息
 - 配置辅助：配置摘要资源、任务推荐、设备操作提示模板
-- 安全约束：参数正则校验、远端路径白名单、结构化审计日志
+- 安全约束：参数正则校验、远端路径白名单/黑名单、内置危险命令拦截、结构化审计日志
 
 当前服务暴露 15 个 MCP 工具、1 个资源和 1 个提示模板。
 
@@ -45,6 +45,10 @@ entrypoint.py                    PyInstaller 构建入口
 - 只允许执行 command_templates 中声明的模板，不提供任意 shell 入口
 - 所有 cmd_exec 参数都通过 `^[a-zA-Z0-9_./:=+\-]+$` 的 fullmatch 校验
 - 所有远端文件路径都经过 PurePosixPath 规范化并受 allowed_roots 约束
+- 可通过 denied_paths 为单设备显式封禁目录/文件（目录前缀命中即拒绝）
+- 所有远端文件路径先做 denied_paths 检查，再做 allowed_roots 检查
+- 内置拦截 Linux/Windows 明确高危命令（如 rm -rf /、mkfs、diskpart、format、强制递归删除系统盘路径）
+- 内置敏感路径（/etc/shadow、/root/.ssh、SAM hive 等）对所有设备文件操作始终拦截，不可被配置覆盖
 - 配置了 known_hosts 时使用 RejectPolicy，未配置时才退化为 AutoAddPolicy
 - 每次工具调用都写入 JSONL 审计日志，字段包括时间、工具名和关键载荷
 
@@ -185,6 +189,7 @@ dist\mcp-device-gateway.exe
 
 - `host`、`username` 必填
 - `allowed_roots: []` 表示不限制远端路径，只建议在可信开发环境使用
+- `denied_paths` 可声明禁止访问的目录或文件，优先级高于 `allowed_roots`
 - `description`、`when_to_use`、`capabilities`、`tags`、`preferred_templates` 用于提升 Agent 选型准确度
 - `os_family` 仅支持 `linux` 或 `windows`，默认 `linux`
 
@@ -230,6 +235,80 @@ command_templates:
 - `examples`：参数示例，供 Agent 生成草案
 - `risk`：`low`、`medium`、`high`
 - `exec_mode`：`sync` 或 `async`
+
+### 内置危险命令拦截
+
+命令模板渲染后会按设备 `os_family` 进行危险命令检测，命中后返回 `DANGEROUS_COMMAND_BLOCKED`，命令不会下发到设备。`exec_*` 系列工具（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`）均适用。
+
+**Linux 拦截项**
+
+| 类别 | 拦截规则 |
+|------|---------|
+| 文件系统 | `rm -rf /`、`mkfs*`、`fdisk`、`parted`、`dd of=/dev/*` |
+| 权限 | `chmod 777 /`（数字/符号模式）、`chown -R ... /` |
+| 网络安全 | `iptables -F/X`、`nft flush ruleset`、`tcpdump -w` |
+| 系统控制 | `shutdown/reboot/poweroff/halt`、`insmod/rmmod/modprobe`、`fork bomb`、`sysctl -w`、`echo > /proc/sysrq-trigger`、`kill 1` |
+| 账户管理 | `useradd/userdel/usermod`、`groupadd/groupdel/groupmod`、`passwd`、`visudo` |
+| 持久化 | `crontab -e/-r`、管道写入 crontab、`at` 定时任务 |
+| 代码注入 | `curl/wget \| bash`、`base64 -d \| bash`、`python/perl/ruby/lua -c/-e` 内联代码 |
+| 反弹 Shell | `bash /dev/tcp/...` TCP 重定向、`nc -e /bin/sh`、`socat exec:` |
+| 进程渗透 | `strace/ltrace -p`、`gdb -p`（进程附加内存读取） |
+| 容器逃逸 | `nsenter`、`unshare` |
+| 内存读取 | `dd if=/dev/mem`、`cat /proc/kcore` |
+| 内核注入 | `LD_PRELOAD=` 动态库注入 |
+| 嵌入式设备 | `flash_erase/nandwrite`、`ubiformat` 等 MTD/UBI 操作、`fw_setenv` U-Boot 环境变量修改 |
+
+**Windows 拦截项**
+
+| 类别 | 拦截规则 |
+|------|---------|
+| 磁盘 | `format <盘符>:`、`diskpart`、`bcdedit` |
+| 删除 | `Remove-Item -Recurse -Force <盘符>:/`、`del /f /s /q <盘符>:/` |
+| 系统控制 | `shutdown`、`Restart-Computer` |
+| 账户与注册表 | `net user`、`net localgroup .../add`、`reg delete/add/import/export` |
+| 防火墙 | `netsh firewall/advfirewall ... disable/reset/delete` |
+| 代码注入 | `Invoke-Expression/iex`、`-EncodedCommand`、`Invoke-WebRequest \| iex` |
+| 权限 | `icacls/cacls/takeown` 操作 Windows 系统目录 |
+| 证据清除 | `vssadmin delete Shadows`、`wmic shadowcopy delete`（勒索软件）、`wevtutil cl` 事件日志清除 |
+| 执行策略绕过 | `Set-ExecutionPolicy Bypass/Unrestricted` |
+| 持久化 | `schtasks /create`、`sc create/config/delete` |
+| LOL-bin | `mshta`、`rundll32`、`regsvr32`（squiblydoo）、`wscript/cscript`、`certutil -urlcache` |
+| AV 禁用 | `Set-MpPreference -Disable*`、`Add-MpPreference -Exclusion*` |
+
+### 内置敏感路径拦截
+
+文件类操作（`dir_list`、`file_stat`、`file_upload`、`file_download`）和命令执行（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`）均会检查内置敏感路径。命中后返回 `SENSITIVE_PATH_BLOCKED`，优先级高于 `denied_paths` 和 `allowed_roots` 配置。
+
+**Linux 内置敏感路径**
+
+| 路径 | 说明 |
+|------|------|
+| `/etc/shadow`、`/etc/gshadow` | 系统/用户组密码哈希 |
+| `/etc/sudoers`、`/etc/sudoers.d` | sudo 权限配置 |
+| `/root/.ssh`、`/root/.gnupg` | root SSH/GPG 私钥 |
+| `/etc/ssl/private`、`/etc/pki` | TLS/SSL 证书私钥 |
+| `/etc/passwd`、`/etc/hosts` | 账户信息/本地 DNS 解析 |
+| `/etc/pam.d`、`/etc/security` | PAM 认证配置（修改可绕过身份验证） |
+| `/etc/ld.so.preload`、`/etc/ld.so.conf` | 动态链接器配置（库注入向量） |
+| `/etc/crontab`、`/etc/cron.d`、`/var/spool/cron` | 定时任务（持久化手法） |
+| `/etc/profile.d`、`/etc/init.d`、`/etc/systemd/system`、`/etc/rc.local` | Shell/服务启动脚本（持久化手法） |
+| `/etc/ssh/sshd_config` | SSH 服务端配置 |
+| `/proc/1/environ` | init 进程环境变量（常含明文凭据） |
+| `/boot` | 引导加载程序与内核镜像（变砖风险） |
+| `/dev/mem`、`/dev/kmem`、`/proc/kcore` | 物理/内核内存（凭据泄漏） |
+| `/dev/mtd` | 嵌入式 MTD Flash 设备节点（写入可永久损坏设备） |
+
+**Windows 内置敏感路径**
+
+| 路径 | 说明 |
+|------|------|
+| `C:/Windows/System32/config` | SAM/SECURITY/SYSTEM 注册表 hive（凭据核心） |
+| `C:/Windows/NTDS` | Active Directory 数据库 |
+| `C:/Users/All Users/Microsoft/Crypto` | 系统密钥材料 |
+| `C:/Windows/System32/drivers/etc/hosts` | hosts 文件（DNS 劫持） |
+| `C:/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup` | 自启动目录（持久化） |
+| `C:/Windows/System32/Tasks` | 计划任务 XML 文件（持久化） |
+| `C:/Windows/System32/winevt/Logs` | 事件日志（防止日志篡改/删除） |
 
 当使用分组结构时，完整命令键格式如下：
 
