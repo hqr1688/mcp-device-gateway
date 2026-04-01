@@ -369,3 +369,7 @@ python -m unittest discover -s tests
 ### 文件操作被拒绝
 
 检查目标路径是否位于 `allowed_roots` 白名单内。
+
+## 许可证
+
+本项目采用 MIT 许可证发布。完整条款见 [LICENSE](LICENSE)。
