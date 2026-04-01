@@ -3,7 +3,9 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = []
 binaries = []
-hiddenimports = ['yaml', 'bcrypt', 'anyio', 'anyio._backends._asyncio', 'anyio._backends._trio']
+hiddenimports = ['mcp_device_gateway.server', 'yaml', 'bcrypt', 'anyio', 'anyio._backends._asyncio', 'anyio._backends._trio']
+tmp_ret = collect_all('mcp_device_gateway')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('mcp')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('paramiko')
