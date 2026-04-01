@@ -31,41 +31,42 @@ class DeviceProfileMetadataTests(unittest.TestCase):
                 os.environ[key] = value
 
     def _write_config(self, config_file: Path) -> None:
-                config_file.write_text(
-                        textwrap.dedent(
-                                """
-                                devices:
-                                    dev1:
-                                        host: 192.168.1.10
-                                        username: root
-                                        os_family: "linux"
-                                        os_name: "Ubuntu"
-                                        os_version: "22.04"
-                                        description: "开发板"
-                                        when_to_use: "日常联调"
-                                        capabilities:
-                                            - "shell-command"
-                                            - "file-transfer"
-                                        tags:
-                                            - "dev"
-                                            - "arm64"
-                                        preferred_templates:
-                                            - "health_check"
-                                        allowed_roots:
-                                            - /tmp/
-                                        denied_paths:
-                                            - /tmp/secret/
-                                            - /tmp/secret.txt
-                                command_templates:
-                                    health_check:
-                                        template: "uname -a; uptime"
-                                        description: "健康检查"
-                                        risk: "low"
-                                """
-                        ).strip()
-                        + "\n",
-                        encoding="utf-8",
-                )
+        config_file.write_text(
+            textwrap.dedent(
+                """
+                devices:
+                    dev1:
+                        host: 192.168.1.10
+                        username: root
+                        os_family: "linux"
+                        os_name: "Ubuntu"
+                        os_version: "22.04"
+                        allow_kernel_module_ops: true
+                        description: "开发板"
+                        when_to_use: "日常联调"
+                        capabilities:
+                            - "shell-command"
+                            - "file-transfer"
+                        tags:
+                            - "dev"
+                            - "arm64"
+                        preferred_templates:
+                            - "health_check"
+                        allowed_roots:
+                            - /tmp/
+                        denied_paths:
+                            - /tmp/secret/
+                            - /tmp/secret.txt
+                command_templates:
+                    health_check:
+                        template: "uname -a; uptime"
+                        description: "健康检查"
+                        risk: "low"
+                """
+            ).strip()
+            + "\n",
+            encoding="utf-8",
+        )
 
     def test_device_metadata_loaded(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -82,6 +83,7 @@ class DeviceProfileMetadataTests(unittest.TestCase):
             self.assertEqual("linux", dev.os_family)
             self.assertEqual("Ubuntu", dev.os_name)
             self.assertEqual("22.04", dev.os_version)
+            self.assertTrue(dev.allow_kernel_module_ops)
             self.assertEqual(("shell-command", "file-transfer"), dev.capabilities)
             self.assertEqual(("dev", "arm64"), dev.tags)
             self.assertEqual(("health_check",), dev.preferred_templates)
@@ -106,7 +108,9 @@ class DeviceProfileMetadataTests(unittest.TestCase):
             self.assertEqual(["shell-command", "file-transfer"], data["capabilities"])
             self.assertEqual(["dev", "arm64"], data["tags"])
             self.assertEqual(["health_check"], data["preferred_templates"])
-            self.assertEqual(["/tmp/secret/", "/tmp/secret.txt"], data["denied_paths"])
+            self.assertNotIn("allow_kernel_module_ops", data)
+            self.assertNotIn("denied_paths", data)
+            self.assertNotIn("host", data)
 
 
 if __name__ == "__main__":

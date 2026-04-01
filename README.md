@@ -1,6 +1,6 @@
 # mcp-device-gateway
 
-面向嵌入式设备工作流的 MCP 服务。它通过设备清单、命令模板、路径白名单和审计日志，为 Agent 提供受控的 SSH/SFTP 访问能力，而不是开放任意 shell。
+面向嵌入式设备工作流的 MCP 服务。它通过设备清单、命令模板、路径白名单和审计日志，为 Agent 提供受控的 SSH/SFTP 访问能力；默认优先使用命令模板，在必要时也允许执行同样受安全规则约束的自定义拼装命令。
 
 ## 快速导航
 
@@ -17,12 +17,12 @@
 ## 核心能力
 
 - 设备发现：列出设备、查看设备画像、验证 SSH 连通性
-- 模板执行：按命令模板执行同步命令、批量并发命令、异步长任务
+- 命令执行：按命令模板执行同步命令、批量并发命令、异步长任务，并支持受安全规则约束的自定义拼装命令
 - 文件操作：上传、下载、列目录、查询远端文件元信息
 - 配置辅助：配置摘要资源、任务推荐、设备操作提示模板
 - 安全约束：参数正则校验、远端路径白名单/黑名单、内置危险命令拦截、结构化审计日志
 
-当前服务暴露 15 个 MCP 工具、1 个资源和 1 个提示模板。
+当前服务暴露 17 个 MCP 工具、1 个资源和 1 个提示模板。
 
 ## 架构概览
 
@@ -42,12 +42,13 @@ entrypoint.py                    PyInstaller 构建入口
 
 ## 安全边界
 
-- 只允许执行 command_templates 中声明的模板，不提供任意 shell 入口
+- 优先执行 `command_templates` 中声明的模板；模板未覆盖时可使用 `custom_exec` / `custom_exec_async` 执行受同等安全规则约束的自定义命令
 - 所有 cmd_exec 参数都通过 `^[a-zA-Z0-9_./:=+\-]+$` 的 fullmatch 校验
 - 所有远端文件路径都经过 PurePosixPath 规范化并受 allowed_roots 约束
 - 可通过 denied_paths 为单设备显式封禁目录/文件（目录前缀命中即拒绝）
 - 所有远端文件路径先做 denied_paths 检查，再做 allowed_roots 检查
 - 内置拦截 Linux/Windows 明确高危命令（如 rm -rf /、mkfs、diskpart、format、强制递归删除系统盘路径）
+- Linux 内核模块加载/卸载默认仍被拦截；仅当设备显式开启 `allow_kernel_module_ops: true` 时，才允许用于驱动开发验证调试
 - 内置敏感路径（/etc/shadow、/root/.ssh、SAM hive 等）对所有设备文件操作始终拦截，不可被配置覆盖
 - 配置了 known_hosts 时使用 RejectPolicy，未配置时才退化为 AutoAddPolicy
 - 每次工具调用都写入 JSONL 审计日志，字段包括时间、工具名和关键载荷
@@ -57,7 +58,7 @@ entrypoint.py                    PyInstaller 构建入口
 ### 发现与规划
 
 - `device_list`：列出设备清单
-- `device_profile_get`：查看设备画像、能力标签和推荐模板
+- `device_profile_get`：查看设备画像、能力标签和推荐模板（不暴露连接地址和安全策略细节）
 - `device_ping`：验证 SSH 连通性
 - `command_template_list`：列出全部模板及用途、参数、风险、执行模式
 - `command_template_get`：查看单个模板详情
@@ -70,6 +71,8 @@ entrypoint.py                    PyInstaller 构建入口
 - `cmd_exec_batch`：并发执行多条独立同步命令
 - `cmd_exec_async`：提交长耗时任务，立即返回 `job_id`
 - `cmd_exec_result`：轮询异步任务结果
+- `custom_exec`：执行符合安全规则的自定义拼装命令
+- `custom_exec_async`：异步提交符合安全规则的自定义拼装命令
 
 ### 文件与目录
 
@@ -90,7 +93,8 @@ entrypoint.py                    PyInstaller 构建入口
 3. 对命令类任务，先用 `task_recommend` 或 `command_template_list`，再用 `command_template_get` 确认 `exec_mode`。
 4. `exec_mode=sync` 时使用 `cmd_exec`；多条独立短命令使用 `cmd_exec_batch`。
 5. `exec_mode=async` 时使用 `cmd_exec_async`，随后调用 `cmd_exec_result` 轮询。
-6. 文件场景使用 `dir_list`、`file_stat`、`file_upload`、`file_download`。
+6. 若模板暂未覆盖目标场景，可改用 `custom_exec` 或 `custom_exec_async`，仍会经过危险命令与敏感路径检查。
+7. 文件场景使用 `dir_list`、`file_stat`、`file_upload`、`file_download`。
 
 ## 快速开始
 
@@ -123,6 +127,9 @@ $env:MCP_TRANSPORT = "stdio"
 - `MCP_AUDIT_LOG`：审计日志路径，默认 `./mcp_audit.log`
 - `MCP_TRANSPORT`：传输层，支持 `stdio`、`sse`、`streamable-http`
 - `MCP_CONFIG_POLL_INTERVAL_SEC`：配置轮询间隔，默认 2 秒
+- `MCP_LOCAL_ALLOWED_ROOTS`：本地上传/下载白名单根目录，多个路径使用系统 `PATH` 分隔符拼接；未设置时保持兼容，不限制本地路径
+- `MCP_ASYNC_JOB_TTL_SEC`：已完成异步任务结果的保留秒数，默认 1800 秒；过期后 `cmd_exec_result` 会返回 `JOB_EXPIRED`
+- `MCP_MAX_CUSTOM_COMMAND_LEN`：自定义命令最大长度，默认 4096；超过后返回 `INVALID_CUSTOM_COMMAND`
 
 ### 启动服务
 
@@ -188,10 +195,12 @@ dist\mcp-device-gateway.exe
 ### devices
 
 - `host`、`username` 必填
+- `port` 必须是 `1..65535` 的整数，默认 `22`
 - `allowed_roots: []` 表示不限制远端路径，只建议在可信开发环境使用
 - `denied_paths` 可声明禁止访问的目录或文件，优先级高于 `allowed_roots`
 - `description`、`when_to_use`、`capabilities`、`tags`、`preferred_templates` 用于提升 Agent 选型准确度
 - `os_family` 仅支持 `linux` 或 `windows`，默认 `linux`
+- `allow_kernel_module_ops` 默认为 `false`；仅建议在驱动开发验证调试设备上显式设为 `true`
 
 ### command_templates
 
@@ -236,18 +245,25 @@ command_templates:
 - `risk`：`low`、`medium`、`high`
 - `exec_mode`：`sync` 或 `async`
 
+### alias_registry
+
+- `alias_registry` 用于把常用短名称映射到完整模板键，例如 `quick_status -> linux_common.health_check`
+- 启动时会校验 alias 是否指向已存在模板
+- alias 不允许与已有完整模板键或 `short_key` 冲突，避免运行时出现歧义
+
 ### 内置危险命令拦截
 
-命令模板渲染后会按设备 `os_family` 进行危险命令检测，命中后返回 `DANGEROUS_COMMAND_BLOCKED`，命令不会下发到设备。`exec_*` 系列工具（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`）均适用。
+命令模板渲染后，或自定义命令提交前，都会按设备 `os_family` 进行危险命令检测，命中后返回 `DANGEROUS_COMMAND_BLOCKED`，命令不会下发到设备。`exec_*` 系列工具（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`、`custom_exec`、`custom_exec_async`）均适用。
 
-**Linux 拦截项**
+#### Linux 拦截项
 
 | 类别 | 拦截规则 |
-|------|---------|
+| ---- | -------- |
 | 文件系统 | `rm -rf /`、`mkfs*`、`fdisk`、`parted`、`dd of=/dev/*` |
 | 权限 | `chmod 777 /`（数字/符号模式）、`chown -R ... /` |
 | 网络安全 | `iptables -F/X`、`nft flush ruleset`、`tcpdump -w` |
-| 系统控制 | `shutdown/reboot/poweroff/halt`、`insmod/rmmod/modprobe`、`fork bomb`、`sysctl -w`、`echo > /proc/sysrq-trigger`、`kill 1` |
+| 系统控制 | `shutdown/reboot/poweroff/halt`、`fork bomb`、`sysctl -w`、`echo > /proc/sysrq-trigger`、`kill 1` |
+| 驱动调试（条件放开） | `insmod/rmmod/modprobe` 默认拦截；仅当设备显式设置 `allow_kernel_module_ops: true` 时允许 |
 | 账户管理 | `useradd/userdel/usermod`、`groupadd/groupdel/groupmod`、`passwd`、`visudo` |
 | 持久化 | `crontab -e/-r`、管道写入 crontab、`at` 定时任务 |
 | 代码注入 | `curl/wget \| bash`、`base64 -d \| bash`、`python/perl/ruby/lua -c/-e` 内联代码 |
@@ -258,10 +274,10 @@ command_templates:
 | 内核注入 | `LD_PRELOAD=` 动态库注入 |
 | 嵌入式设备 | `flash_erase/nandwrite`、`ubiformat` 等 MTD/UBI 操作、`fw_setenv` U-Boot 环境变量修改 |
 
-**Windows 拦截项**
+#### Windows 拦截项
 
 | 类别 | 拦截规则 |
-|------|---------|
+| ---- | -------- |
 | 磁盘 | `format <盘符>:`、`diskpart`、`bcdedit` |
 | 删除 | `Remove-Item -Recurse -Force <盘符>:/`、`del /f /s /q <盘符>:/` |
 | 系统控制 | `shutdown`、`Restart-Computer` |
@@ -277,12 +293,14 @@ command_templates:
 
 ### 内置敏感路径拦截
 
-文件类操作（`dir_list`、`file_stat`、`file_upload`、`file_download`）和命令执行（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`）均会检查内置敏感路径。命中后返回 `SENSITIVE_PATH_BLOCKED`，优先级高于 `denied_paths` 和 `allowed_roots` 配置。
+文件类操作（`dir_list`、`file_stat`、`file_upload`、`file_download`）和命令执行（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`、`custom_exec`、`custom_exec_async`）均会检查内置敏感路径。命中后返回 `SENSITIVE_PATH_BLOCKED`，优先级高于 `denied_paths` 和 `allowed_roots` 配置。
 
-**Linux 内置敏感路径**
+文件类工具还要求 `remote_path` 必须是绝对路径：Linux 使用 `/...`，Windows 使用 `C:/...` 形式；相对路径会直接返回 `REMOTE_PATH_MUST_BE_ABSOLUTE`。在进入白名单、黑名单和敏感路径判断前，路径还会先做规范化并消解 `.` / `..`，防止目录穿越绕过校验。
+
+#### Linux 内置敏感路径
 
 | 路径 | 说明 |
-|------|------|
+| ---- | ---- |
 | `/etc/shadow`、`/etc/gshadow` | 系统/用户组密码哈希 |
 | `/etc/sudoers`、`/etc/sudoers.d` | sudo 权限配置 |
 | `/root/.ssh`、`/root/.gnupg` | root SSH/GPG 私钥 |
@@ -298,10 +316,10 @@ command_templates:
 | `/dev/mem`、`/dev/kmem`、`/proc/kcore` | 物理/内核内存（凭据泄漏） |
 | `/dev/mtd` | 嵌入式 MTD Flash 设备节点（写入可永久损坏设备） |
 
-**Windows 内置敏感路径**
+#### Windows 内置敏感路径
 
 | 路径 | 说明 |
-|------|------|
+| ---- | ---- |
 | `C:/Windows/System32/config` | SAM/SECURITY/SYSTEM 注册表 hive（凭据核心） |
 | `C:/Windows/NTDS` | Active Directory 数据库 |
 | `C:/Users/All Users/Microsoft/Crypto` | 系统密钥材料 |
@@ -316,11 +334,75 @@ command_templates:
 - `linux_common.<template_key>`
 - `device_specific.<device_name>.<template_key>`
 
+命令执行工具（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`）对 `command_key` 的解析规则：
+
+- 默认 `strict=false`：优先按完整键精确匹配；未命中时允许按 `short_key` 自动解析（先设备作用域，再全局）。
+- `strict=true`：仅接受完整键，不做短键容错。
+- 解析失败时会返回候选提示，例如 `Did you mean: linux_common.health_check`。
+
+`cmd_exec_batch` 额外支持：
+
+- `fail_fast=false`（默认）：单条失败不影响其他命令，返回逐条结果（含每条 `status` / `error`）。
+- `fail_fast=true`：遇到第一条校验错误立即失败，行为与历史版本一致。
+
+参数校验新增强类型模式（兼容旧模式）：
+
+- 若模板配置 `arg_schema`，则按类型校验参数（`path`、`int`、`enum`、`bool`、`service_name`、`filename`）。
+- `path` 类型支持 UTF-8 与空格（可通过 `allow_utf8` / `allow_space` 控制），并拒绝命令拼接危险字符。
+- `path` 类型参数在包含空格时会自动按设备 OS 做安全加引号；若模板自身已经写了包裹 `{0}` 的引号，则不会重复加引号。
+- 未配置 `arg_schema` 时，仍沿用原有 `args_sanitize_pattern` 规则，保持兼容。
+- Windows 路径会统一按 `/` 形式并以大小写无关方式规范化，再参与 `allowed_roots`、`denied_paths` 与内置敏感路径校验。
+
+执行结果增强：
+
+- 返回 `normalized_status`（`success|partial|failed`）。
+- 模板可配置 `success_on_exit_codes`（例如 `[0,124]`）。
+- 返回 `collected_duration_ms` 与 `output_truncated`，用于区分“超时但有有效输出”的场景。
+- 模板可声明 `parser`，返回 `structured_output`（并保留 `raw_output`）。
+
+统一响应外层（兼容模式）：
+
+- `cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`、`cmd_exec_result`、`custom_exec`、`custom_exec_async`、`command_template_list` 支持 `compat_mode`。
+- 默认 `compat_mode=legacy`：返回历史结构，保证旧客户端兼容。
+- `compat_mode=v1_1`：返回统一外层字段：`request_id`、`timestamp`、`api_version`、`status`、`error`、`data`、`meta`。
+- 在 `compat_mode=v1_1` 下，常见业务错误会返回结构化 `error` 对象（`code/message/details/recoverable/suggestion`），而不是直接抛异常。
+- 在 `compat_mode=legacy` 下，仍保持历史抛异常行为。
+
+稳定错误码（兼容保留旧错误语义）：
+
+- `GW-1002`：参数错误（对应 `INVALID_COMMAND_ARGS`）。
+- `GW-1004`：分页参数非法（对应 `INVALID_PAGE`）。
+- `GW-1005`：分页大小非法（对应 `INVALID_PAGE_SIZE`）。
+- `GW-2001`：模板未找到（对应 `UNKNOWN_COMMAND_TEMPLATE`）。
+- `GW-2003`：模板不适用于当前设备（对应 `TEMPLATE_NOT_APPLICABLE`）。
+- `GW-2004`：调用工具与模板 `exec_mode` 不匹配（对应 `EXEC_MODE_MISMATCH`）。
+- `GW-3001`：设备未找到（对应 `DEVICE_NOT_FOUND/UNKNOWN_DEVICE`）。
+- `GW-4002`：异步任务未找到（对应 `UNKNOWN_JOB`）。
+
+模板列表接口增强：
+
+- `command_template_list` 支持 `device_name`、`category`、`exec_mode`、`keyword` 过滤。
+- 支持 `page/page_size` 分页与 `only_fields` 字段裁剪。
+- `page` 必须 `>= 1`，`page_size` 取值范围为 `1..500`；非法值在 `v1_1` 下会返回结构化错误对象。
+- 支持 `changed_since` 增量同步。
+
+权限提示增强：
+
+- 模板可声明 `requires_privilege`（`none|sudo|root`）、`fallback_templates` 与 `capability_tags`。
+- 权限失败时，响应会给出 `permission_suggestion` 与可替代模板建议。
+
+别名与纠错增强：
+
+- 顶层配置支持 `alias_registry`（常用名映射到完整模板 key）。
+- `task_recommend` 可对 full key / short key / alias 做自动纠正并返回精确模板键。
+
 适用性约束：
 
 - `windows_common.*` 仅允许在 `os_family=windows` 设备执行
 - `linux_common.*` 仅允许在 `os_family=linux` 设备执行
 - `device_specific.*` 仅允许在对应设备执行
+- `cmd_exec` / `cmd_exec_batch` 仅允许执行 `exec_mode=sync` 模板；`cmd_exec_async` 仅允许执行 `exec_mode=async` 模板
+- `file_upload` / `file_download` 在配置了 `MCP_LOCAL_ALLOWED_ROOTS` 时，只允许读写命中的本地根目录
 
 ### 配置不可用时的行为
 
@@ -328,6 +410,7 @@ command_templates:
 - 若配置文件不存在，会自动生成空模板文件
 - 在配置恢复可用前，业务工具调用会返回 `CONFIG_UNAVAILABLE`
 - 后台监测线程会自动重新加载修复后的配置
+- 配置热加载成功后会主动关闭 SSH 连接池，避免旧连接继续复用旧凭据或旧 `known_hosts` 策略
 
 ## 打包与发布
 

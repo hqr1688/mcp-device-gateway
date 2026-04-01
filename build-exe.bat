@@ -9,8 +9,8 @@
 ::  Options:
 ::    --python  <exe>    Python executable (default: auto-detect .venv)
 ::    --onefile          Bundle into a single .exe (default)
-::    --onedir           Bundle as exe + _internal directory
-::    --clean            Remove build\ and dist\ before building
+::    --onedir           Bundle as exe + _internal directory (default)
+::    --clean            Remove build\ and dist\ before building (default)
 ::
 ::  Output:
 ::    One-file (default): dist\mcp-device-gateway.exe
@@ -27,14 +27,14 @@ cd /d "%~dp0"
 :: ── defaults ────────────────────────────────────────────────────
 set "PYTHON_EXE=python"
 set "ONEFILE=1"
-set "DO_CLEAN=0"
+set "DO_CLEAN=1"
 
 :: ── parse args ──────────────────────────────────────────────────
 :parse_args
 if "%~1"=="" goto :done_args
 if /i "%~1"=="--python"   ( set "PYTHON_EXE=%~2" & shift & shift & goto :parse_args )
 if /i "%~1"=="--onefile"  ( set "ONEFILE=1"      & shift & goto :parse_args )
-if /i "%~1"=="--onedir"   ( set "ONEFILE=0"      & shift & goto :parse_args )
+if /i "%~1"=="--onedir"   ( set "ONEFILE=1"      & shift & goto :parse_args )
 if /i "%~1"=="--clean"    ( set "DO_CLEAN=1"     & shift & goto :parse_args )
 echo [WARN] Unknown argument: %~1
 shift & goto :parse_args

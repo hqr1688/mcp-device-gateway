@@ -5,7 +5,7 @@
 ## 当前服务面
 
 - 服务名：embedded-device-gateway
-- 暴露面：15 个工具、1 个资源、1 个提示词
+- 暴露面：17 个工具、1 个资源、1 个提示词
 - 当前已加载设备：2 台，分别是“相机”和“虚拟机”
 - 当前已加载模板：23 条
 - 模板风险分布：low 18 条，medium 5 条，high 0 条
@@ -18,7 +18,7 @@
 
 - capability_overview：无参数，返回服务能力地图、工具/资源/提示词清单、推荐工作流和执行模式指引。
 - device_list：无参数，返回全部设备画像列表，适合作为任何设备类操作的起点。
-- device_profile_get：参数为 device_name，返回单个设备的用途、能力标签和推荐模板。
+- device_profile_get：参数为 device_name，返回单个设备的用途、能力标签和推荐模板，不暴露连接地址和路径策略细节。
 - device_ping：参数为 device_name，返回 reachable 布尔值，用于 SSH 连通性预检。
 - command_template_list：无参数，返回全部模板及风险、参数、执行模式，适合发现可用命令。
 - command_template_get：参数为 command_key，返回单个模板的完整元数据，适合执行前确认 exec_mode。
@@ -30,6 +30,8 @@
 - cmd_exec_batch：参数为 device_name、commands，按输入顺序返回多条 sync 模板的执行结果，适合并发采集指标。
 - cmd_exec_async：参数为 device_name、command_key、args、timeout_sec，提交 async 模板并返回 job_id。
 - cmd_exec_result：参数为 job_id，返回 running、done 或 error 状态，以及任务结果。
+- custom_exec：参数为 device_name、command、timeout_sec，执行符合安全规则的自定义拼装命令。
+- custom_exec_async：参数为 device_name、command、timeout_sec，异步提交符合安全规则的自定义拼装命令。
 
 ### 文件与目录
 
@@ -88,4 +90,5 @@
 1. 先调用 capability_overview 或 device_list 了解当前服务面。
 2. 再调用 device_profile_get 和 device_ping 确认目标设备是否适合且可达。
 3. 执行前调用 command_template_get，按 exec_mode 在 cmd_exec、cmd_exec_batch、cmd_exec_async 之间选择。
-4. 若只知道任务描述，优先使用 task_recommend，再按返回的 recommended_tool 执行。
+4. 若模板未覆盖目标任务，可退回到 custom_exec 或 custom_exec_async。
+5. 若只知道任务描述，优先使用 task_recommend，再按返回的 recommended_tool 执行。

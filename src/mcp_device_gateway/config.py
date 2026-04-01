@@ -28,12 +28,14 @@ class DeviceConfig:
     os_family: str = "linux"
     os_name: str = ""
     os_version: str = ""
+    allow_kernel_module_ops: bool = False
 
 
 @dataclass(frozen=True)
 class AppConfig:
     devices: dict[str, DeviceConfig]
     command_templates: dict[str, "CommandTemplate"]
+    alias_registry: dict[str, str]
     audit_log: str
 
 
@@ -50,6 +52,12 @@ class CommandTemplate:
     exec_mode: str = "sync"
     category: str = "legacy"
     device_name: str | None = None
+    arg_schema: tuple[dict[str, Any], ...] = ()
+    success_on_exit_codes: tuple[int, ...] = (0,)
+    requires_privilege: str = "none"
+    capability_tags: tuple[str, ...] = ()
+    fallback_templates: tuple[str, ...] = ()
+    parser: str = ""
 
 
 def _read_yaml(file_path: Path) -> dict[str, Any]:
@@ -64,9 +72,23 @@ def _read_yaml(file_path: Path) -> dict[str, Any]:
     return content
 
 
+def _required_text(raw: dict[str, Any], field_name: str, device_name: str) -> str:
+    value = str(raw.get(field_name, "")).strip()
+    if not value:
+        raise ValueError(f"Device '{device_name}' must define non-empty {field_name}.")
+    return value
+
+
 def _to_device(name: str, raw: dict[str, Any]) -> DeviceConfig:
-    if not raw.get("host") or not raw.get("username"):
-        raise ValueError(f"Device '{name}' must define host and username.")
+    host = _required_text(raw, "host", name)
+    username = _required_text(raw, "username", name)
+
+    try:
+        port = int(raw.get("port", 22))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Device '{name}' port must be an integer.") from exc
+    if port < 1 or port > 65535:
+        raise ValueError(f"Device '{name}' port must be between 1 and 65535.")
 
     allowed_roots: Any = raw.get("allowed_roots") or []
     if not isinstance(allowed_roots, list):
@@ -98,14 +120,18 @@ def _to_device(name: str, raw: dict[str, Any]) -> DeviceConfig:
     if os_family and os_family not in {"linux", "windows"}:
         raise ValueError(f"Device '{name}' os_family must be 'linux' or 'windows'.")
 
+    allow_kernel_module_ops = raw.get("allow_kernel_module_ops", False)
+    if not isinstance(allow_kernel_module_ops, bool):
+        raise ValueError(f"Device '{name}' allow_kernel_module_ops must be a boolean.")
+
     return DeviceConfig(
         name=name,
-        host=str(raw["host"]),
-        username=str(raw["username"]),
-        port=int(raw.get("port", 22)),
-        key_file=str(raw["key_file"]) if raw.get("key_file") else None,
-        password=str(raw["password"]) if raw.get("password") else None,
-        known_hosts=str(raw["known_hosts"]) if raw.get("known_hosts") else None,
+        host=host,
+        username=username,
+        port=port,
+        key_file=str(raw["key_file"]).strip() if raw.get("key_file") else None,
+        password=str(raw["password"]).strip() if raw.get("password") else None,
+        known_hosts=str(raw["known_hosts"]).strip() if raw.get("known_hosts") else None,
         allowed_roots=tuple(str(p) for p in allowed_roots_list),
         denied_paths=tuple(str(p) for p in denied_paths_list),
         description=str(raw.get("description", "")).strip(),
@@ -116,6 +142,7 @@ def _to_device(name: str, raw: dict[str, Any]) -> DeviceConfig:
         os_family=os_family,
         os_name=str(raw.get("os_name", "")).strip(),
         os_version=str(raw.get("os_version", "")).strip(),
+        allow_kernel_module_ops=allow_kernel_module_ops,
     )
 
 
@@ -171,6 +198,24 @@ def _to_command_template(
     args_list = cast(list[Any], args_value)
     arg_names = tuple(str(item).strip() for item in args_list if str(item).strip())
 
+    arg_schema_value: Any = raw_map.get("arg_schema", [])
+    if arg_schema_value is None:
+        arg_schema_value = []
+    if not isinstance(arg_schema_value, list):
+        raise ValueError(f"Template '{key}' arg_schema must be a list.")
+
+    parsed_arg_schema: list[dict[str, Any]] = []
+    for idx, schema in enumerate(cast(list[Any], arg_schema_value)):
+        if not isinstance(schema, dict):
+            raise ValueError(f"Template '{key}' arg_schema[{idx}] must be a mapping.")
+        schema_map = cast(dict[str, Any], schema)
+        arg_type = str(schema_map.get("type", "")).strip().lower()
+        if arg_type not in {"path", "int", "enum", "bool", "service_name", "filename"}:
+            raise ValueError(
+                f"Template '{key}' arg_schema[{idx}].type must be one of path/int/enum/bool/service_name/filename."
+            )
+        parsed_arg_schema.append(dict(schema_map))
+
     examples_value: Any = raw_map.get("examples", [])
     if examples_value is None:
         examples_value = []
@@ -205,6 +250,50 @@ def _to_command_template(
                 f"Template '{key}' example args count is less than required placeholders: {required_count}."
             )
 
+    if parsed_arg_schema and len(parsed_arg_schema) < required_count:
+        raise ValueError(
+            f"Template '{key}' arg_schema count is less than required placeholders: {required_count}."
+        )
+
+    success_codes_value: Any = raw_map.get("success_on_exit_codes", [0])
+    if success_codes_value is None:
+        success_codes_value = [0]
+    if not isinstance(success_codes_value, list):
+        raise ValueError(f"Template '{key}' success_on_exit_codes must be a list.")
+    parsed_success_codes: list[int] = []
+    for code in cast(list[Any], success_codes_value):
+        try:
+            parsed_code = int(code)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Template '{key}' success_on_exit_codes must contain integers.") from exc
+        if parsed_code < 0 or parsed_code > 255:
+            raise ValueError(f"Template '{key}' success_on_exit_codes must be between 0 and 255.")
+        if parsed_code not in parsed_success_codes:
+            parsed_success_codes.append(parsed_code)
+    success_codes = tuple(parsed_success_codes) or (0,)
+
+    requires_privilege = str(raw_map.get("requires_privilege", "none")).strip().lower() or "none"
+    if requires_privilege not in {"none", "sudo", "root"}:
+        raise ValueError(f"Template '{key}' requires_privilege must be one of none/sudo/root.")
+
+    capability_tags_value: Any = raw_map.get("capability_tags", [])
+    if capability_tags_value is None:
+        capability_tags_value = []
+    if not isinstance(capability_tags_value, list):
+        raise ValueError(f"Template '{key}' capability_tags must be a list.")
+    capability_tags = tuple(str(tag).strip() for tag in cast(list[Any], capability_tags_value) if str(tag).strip())
+
+    fallback_templates_value: Any = raw_map.get("fallback_templates", [])
+    if fallback_templates_value is None:
+        fallback_templates_value = []
+    if not isinstance(fallback_templates_value, list):
+        raise ValueError(f"Template '{key}' fallback_templates must be a list.")
+    fallback_templates = tuple(str(item).strip() for item in cast(list[Any], fallback_templates_value) if str(item).strip())
+
+    parser = str(raw_map.get("parser", "")).strip().lower()
+    if parser and parser not in {"free", "df", "systemctl", "journal"}:
+        raise ValueError(f"Template '{key}' parser must be one of free/df/systemctl/journal.")
+
     return CommandTemplate(
         key=key,
         short_key=short_key or key,
@@ -217,6 +306,12 @@ def _to_command_template(
         exec_mode=exec_mode,
         category=category,
         device_name=device_name,
+        arg_schema=tuple(parsed_arg_schema),
+        success_on_exit_codes=success_codes,
+        requires_privilege=requires_privilege,
+        capability_tags=capability_tags,
+        fallback_templates=fallback_templates,
+        parser=parser,
     )
 
 
@@ -312,8 +407,27 @@ def load_config() -> AppConfig:
         for key, value in templates_map.items():
             parsed_templates[str(key)] = _to_command_template(str(key), value)
 
+    alias_raw: Any = raw.get("alias_registry") or {}
+    if not isinstance(alias_raw, dict):
+        raise ValueError("alias_registry must be a mapping.")
+    short_keys = {item.short_key for item in parsed_templates.values()}
+    alias_registry: dict[str, str] = {}
+    for alias, target in cast(dict[Any, Any], alias_raw).items():
+        alias_key = str(alias).strip()
+        target_key = str(target).strip()
+        if not alias_key or not target_key:
+            continue
+        if alias_key in parsed_templates:
+            raise ValueError(f"Alias '{alias_key}' conflicts with an existing command template key.")
+        if alias_key in short_keys:
+            raise ValueError(f"Alias '{alias_key}' conflicts with an existing template short key.")
+        if target_key not in parsed_templates:
+            raise ValueError(f"Alias '{alias_key}' references unknown command template '{target_key}'.")
+        alias_registry[alias_key] = target_key
+
     return AppConfig(
         devices=devices,
         command_templates=parsed_templates,
+        alias_registry=alias_registry,
         audit_log=audit_log,
     )

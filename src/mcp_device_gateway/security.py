@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import re
+import shlex
+from posixpath import normpath
 from pathlib import PurePosixPath
 
 SAFE_ARG_PATTERN = re.compile(r"^[a-zA-Z0-9_./:=+\-]+$")
+_SHELL_SEGMENT_SPLIT_PATTERN = re.compile(r"(?:&&|\|\||;|\|)")
+_ENV_ASSIGNMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
 # ---------- Linux：破坏性操作 ----------
 _LINUX_DANGEROUS_COMMAND_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -22,27 +26,12 @@ _LINUX_DANGEROUS_COMMAND_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(^|\s)nft\s+flush\s+ruleset", re.IGNORECASE), "禁止清空 nftables 规则"),
     # 系统控制
     (re.compile(r"(^|\s):\(\)\{\s*:\|:\s*&\s*\};:\s", re.IGNORECASE), "禁止 fork bomb"),
-    (re.compile(r"(^|\s)(shutdown|reboot|poweroff|halt)(\s|$|[;&|])", re.IGNORECASE), "禁止主机关机或重启"),
-    (re.compile(r"(^|\s)(insmod|rmmod|modprobe)\s+", re.IGNORECASE), "禁止加载或卸载内核模块"),
-    # 账户与权限管理
-    (re.compile(r"(^|\s)(useradd|userdel|usermod)\s+", re.IGNORECASE), "禁止修改系统用户"),
-    (re.compile(r"(^|\s)(groupadd|groupdel|groupmod)\s+", re.IGNORECASE), "禁止修改系统用户组"),
-    (re.compile(r"(^|\s)passwd(\s|$|[;&|])", re.IGNORECASE), "禁止修改系统账户密码"),
     # 远程代码注入
     (re.compile(r"(curl|wget)\s+[^\n]+\|\s*(ba)?sh", re.IGNORECASE), "禁止从远程拉取并执行脚本"),
     (re.compile(r"base64\s+-d[^\n]+\|\s*(ba)?sh", re.IGNORECASE), "禁止 base64 解码后执行脚本"),
-    # 解释器内联代码注入（常见代码注入路径）
-    (re.compile(r"(^|\s)python[23]?\s+-c\b", re.IGNORECASE), "禁止通过 Python 解释器执行内联代码"),
-    (re.compile(r"(^|\s)perl\s+-e\b", re.IGNORECASE), "禁止通过 Perl 解释器执行内联代码"),
-    (re.compile(r"(^|\s)ruby\s+-e\b", re.IGNORECASE), "禁止通过 Ruby 解释器执行内联代码"),
-    (re.compile(r"(^|\s)lua\s+-e\b", re.IGNORECASE), "禁止通过 Lua 解释器执行内联代码"),
-    # 反弹 shell（netcat）
-    (re.compile(r"(^|\s)(nc|ncat|netcat)\s+[^\n]*-e\s+/bin/(ba)?sh\b", re.IGNORECASE), "禁止通过 netcat 创建反弹 shell"),
     # 物理内存与内核内存读取
     (re.compile(r"(^|\s)dd\s+[^\n]*\bif=/dev/(mem|kmem)\b", re.IGNORECASE), "禁止读取物理内存或内核内存设备"),
     (re.compile(r"(^|\s)cat\s+/proc/kcore(\s|$|[;&|])", re.IGNORECASE), "禁止读取内核内存转储文件"),
-    # 内核运行时参数修改
-    (re.compile(r"(^|\s)sysctl\s+-w\b", re.IGNORECASE), "禁止直接修改内核运行时参数"),
     # SysRq 触发器（可强制触发内核崩溃/重启/同步）
     (re.compile(r"echo\s+[^\n]*>\s*/proc/sysrq-trigger", re.IGNORECASE), "禁止通过 SysRq 触发器操控内核"),
     # 动态库预加载注入（rootkit 常用手法）
@@ -52,28 +41,8 @@ _LINUX_DANGEROUS_COMMAND_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # crontab 写操作（持久化手法；列举 -l 不在拦截范围）
     (re.compile(r"(^|\s)crontab\s+-(e|r)(\s|$|[;&|])", re.IGNORECASE), "禁止通过 crontab 编辑或清除定时任务"),
     (re.compile(r"\|\s*crontab(\s|$|[;&|])", re.IGNORECASE), "禁止通过管道向 crontab 写入定时任务"),
-    # visudo（直接交互式编辑 sudoers，绕过文件路径拦截）
-    (re.compile(r"(^|\s)visudo(\s|$|[;&|])", re.IGNORECASE), "禁止通过 visudo 编辑 sudoers 权限配置"),
-    # 嵌入式 Flash 操作（CRITICAL：写错分区可永久损坏设备）
-    (re.compile(r"(^|\s)(flash_erase|flash_eraseall|nandwrite|nanddump)\s+", re.IGNORECASE), "禁止直接操作嵌入式 NAND/NOR Flash（可永久损坏设备）"),
-    (re.compile(r"(^|\s)(ubiformat|ubirmvol|ubimkvol|ubirsvol)\s+", re.IGNORECASE), "禁止操作 UBI Flash 卷（可永久损坏 Flash 分区）"),
-    (re.compile(r"(^|\s)fw_setenv\s+", re.IGNORECASE), "禁止修改 U-Boot 引导加载程序环境变量"),
-    # 网络流量捕获写文件（可捕获含凭据的流量）
-    (re.compile(r"(^|\s)tcpdump\s+[^\n]*-w\s+", re.IGNORECASE), "禁止通过 tcpdump 将网络流量捕获写入文件"),
     # bash TCP 重定向反弹 shell
     (re.compile(r"bash\s+[^\n]*>\s*&?\s*/dev/tcp/", re.IGNORECASE), "禁止通过 bash TCP 重定向创建反弹 shell"),
-    # 杀死 init 进程（PID 1），导致系统崩溃
-    (re.compile(r"(^|\s)kill\s+(-\d+\s+|-SIG\w+\s+)?1(\s|$|[;&|])", re.IGNORECASE), "禁止通过 kill 终止 init/systemd（PID 1）进程"),
-    # socat 反弹 shell
-    (re.compile(r"(^|\s)socat\s+[^\n]*\bexec:", re.IGNORECASE), "禁止通过 socat 创建交互式 shell 或反弹 shell"),
-    # 进程内存读取（凭据窃取）
-    (re.compile(r"(^|\s)(strace|ltrace)\s+(-p|--pid)\b", re.IGNORECASE), "禁止通过 strace/ltrace 附加进程（可窃取运行时凭据）"),
-    (re.compile(r"(^|\s)gdb\s+[^\n]*(-p|--pid)\b", re.IGNORECASE), "禁止通过 gdb 附加进程（可读取任意进程内存）"),
-    # 容器/命名空间逃逸
-    (re.compile(r"(^|\s)nsenter\s+", re.IGNORECASE), "禁止通过 nsenter 进入其他进程命名空间（容器逃逸向量）"),
-    (re.compile(r"(^|\s)unshare\s+", re.IGNORECASE), "禁止通过 unshare 创建新命名空间（可用于权限逃逸）"),
-    # at 定时任务（持久化手法）
-    (re.compile(r"(^|\s)at(\s+|$)", re.IGNORECASE), "禁止通过 at 创建定时任务（常见持久化手法，T1053.001）"),
 )
 
 # ---------- Windows：破坏性操作 ----------
@@ -85,11 +54,6 @@ _WINDOWS_DANGEROUS_COMMAND_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # 文件删除
     (re.compile(r"remove-item\s+[^\n]*-recurse[^\n]*-force[^\n]*[a-z]:[/\\]", re.IGNORECASE), "禁止强制递归删除系统盘路径"),
     (re.compile(r"(^|\s)del\s+/f\s+/s\s+/q\s+[a-z]:[/\\]", re.IGNORECASE), "禁止强制递归删除系统盘路径"),
-    # 系统控制
-    (re.compile(r"(^|\s)(shutdown|restart-computer)\b", re.IGNORECASE), "禁止主机关机或重启"),
-    # 账户与注册表
-    (re.compile(r"(^|\s)net\s+user\b", re.IGNORECASE), "禁止管理系统用户账户"),
-    (re.compile(r"(^|\s)reg\s+(delete|add|import|export)\b", re.IGNORECASE), "禁止修改或导出注册表"),
     # 防火墙
     (re.compile(r"(^|\s)netsh\s+[^\n]*(firewall|advfirewall)[^\n]*(set[^\n]+off|disable|reset|delete)\b", re.IGNORECASE), "禁止关闭或重置防火墙"),
     # 远程代码注入
@@ -98,31 +62,6 @@ _WINDOWS_DANGEROUS_COMMAND_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(invoke-webrequest|wget|curl)[^\n]+\|\s*(iex|invoke-expression|powershell)", re.IGNORECASE), "禁止从远程拉取并执行脚本"),
     # 权限
     (re.compile(r"(^|\s)(icacls|cacls|takeown)[^\n]+[a-z]:[/\\]windows[/\\]", re.IGNORECASE), "禁止修改 Windows 系统目录权限"),
-    # 卷影副本删除（勒索软件标志性手法）
-    (re.compile(r"(^|\s)vssadmin\s+delete\s+shadows\b", re.IGNORECASE), "禁止删除卷影副本（防范勒索软件）"),
-    (re.compile(r"(^|\s)wmic\s+[^\n]*shadowcopy[^\n]*delete\b", re.IGNORECASE), "禁止通过 wmic 删除卷影副本（防范勒索软件）"),
-    # PowerShell 执行策略绕过
-    (re.compile(r"(^|\s)Set-ExecutionPolicy\s+(Bypass|Unrestricted)\b", re.IGNORECASE), "禁止绕过 PowerShell 执行策略"),
-    # 计划任务创建（持久化手法）
-    (re.compile(r"(^|\s)schtasks\s+/create\b", re.IGNORECASE), "禁止创建计划任务（常见持久化手法）"),
-    # 事件日志清除（勒索软件/APT 常见证据销毁手法）
-    (re.compile(r"(^|\s)wevtutil\s+(cl|clear-log)\b", re.IGNORECASE), "禁止清除 Windows 事件日志（T1070.001）"),
-    # Windows 服务创建与修改（持久化手法）
-    (re.compile(r"(^|\s)sc\s+(create|config|delete)\b", re.IGNORECASE), "禁止创建或修改 Windows 服务（常见持久化手法）"),
-    # certutil LOL-bin 文件下载（常用于绕过杀毒检测）
-    (re.compile(r"(^|\s)certutil\s+[^\n]*-urlcache\b", re.IGNORECASE), "禁止通过 certutil 下载远程文件（LOL-bin）"),
-    # 提权：将用户加入管理员组
-    (re.compile(r"(^|\s)net\s+localgroup[^\n]*/add\b", re.IGNORECASE), "禁止将用户添加到本地组（可用于提权）"),
-    # mshta LOL-bin（执行 HTA 文件，常见代码执行绕过手法）
-    (re.compile(r"(^|\s)mshta\s+", re.IGNORECASE), "禁止通过 mshta 执行 HTA 文件（LOL-bin）"),
-    # rundll32 LOL-bin（加载攻击者控制的 DLL）
-    (re.compile(r"(^|\s)rundll32\s+", re.IGNORECASE), "禁止通过 rundll32 执行任意 DLL（LOL-bin）"),
-    # regsvr32 squiblydoo LOL-bin（可远程加载 COM scriptlet，绕过 AppLocker）
-    (re.compile(r"(^|\s)regsvr32\s+", re.IGNORECASE), "禁止通过 regsvr32 执行脚本（squiblydoo LOL-bin）"),
-    # Windows Script Host LOL-bin
-    (re.compile(r"(^|\s)(wscript|cscript)\s+", re.IGNORECASE), "禁止通过 wscript/cscript 执行脚本（LOL-bin）"),
-    # 禁用 Windows Defender / AV 实时保护
-    (re.compile(r"(^|\s)(Set-MpPreference|Add-MpPreference)\s+[^\n]*(Disable|Exclusion)", re.IGNORECASE), "禁止通过 PowerShell 禁用 Windows Defender 或添加 AV 排除项"),
 )
 
 # ---------- 内置敏感路径：Linux ----------
@@ -171,6 +110,229 @@ _WINDOWS_BUILTIN_SENSITIVE_PATHS: tuple[str, ...] = (
 )
 
 
+def _normalized_os_family(os_family: str) -> str:
+    return (os_family or "linux").strip().lower() or "linux"
+
+
+def _normalize_remote_path(remote_path: str, os_family: str = "linux") -> str:
+    text = str(remote_path).replace("\\", "/").strip()
+    if not text:
+        return "."
+    normalized = normpath(text)
+    if text.startswith("//") and not normalized.startswith("//"):
+        normalized = "/" + normalized
+    if text.startswith("/") and not normalized.startswith("/"):
+        normalized = "/" + normalized.lstrip("/")
+    normalized = str(PurePosixPath(normalized))
+    if _normalized_os_family(os_family) == "windows":
+        return normalized.lower()
+    return normalized
+
+
+def _path_prefix_matches(normalized_path: str, normalized_root: str) -> bool:
+    return normalized_path == normalized_root or normalized_path.startswith(normalized_root.rstrip("/") + "/")
+
+
+def _command_references_path(command: str, remote_path: str, os_family: str) -> bool:
+    normalized_command = str(command).replace("\\", "/")
+    normalized_path = _normalize_remote_path(remote_path, os_family)
+    if _normalized_os_family(os_family) == "windows":
+        normalized_command = normalized_command.lower()
+    if not normalized_path:
+        return False
+    path_pattern = re.compile(
+        rf"(^|[^a-zA-Z0-9_./:-]){re.escape(normalized_path)}(?=$|/|[^a-zA-Z0-9_.-])"
+    )
+    return path_pattern.search(normalized_command) is not None
+
+
+def _split_shell_segments(command: str) -> list[str]:
+    return [segment.strip() for segment in _SHELL_SEGMENT_SPLIT_PATTERN.split(command) if segment.strip()]
+
+
+def _tokenize_segment(segment: str) -> list[str]:
+    try:
+        return shlex.split(segment, posix=True)
+    except ValueError:
+        return segment.split()
+
+
+def _is_env_assignment(token: str) -> bool:
+    return _ENV_ASSIGNMENT_PATTERN.fullmatch(token) is not None
+
+
+def _command_basename(token: str) -> str:
+    basename = token.replace("\\", "/").rsplit("/", maxsplit=1)[-1].lower()
+    basename = basename.strip("{}()[]")
+    for suffix in (".exe", ".cmd", ".bat", ".ps1"):
+        if basename.endswith(suffix):
+            return basename[: -len(suffix)]
+    return basename
+
+
+def _is_command_option(args: list[str], option: str) -> bool:
+    for arg in args:
+        if arg == option:
+            return True
+        if option.startswith("--") and arg.startswith(f"{option}="):
+            return True
+        if len(option) == 2 and option.startswith("-") and arg.startswith(option) and len(arg) > 2:
+            return True
+    return False
+
+
+def _effective_command(tokens: list[str]) -> tuple[str, list[str]] | None:
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        base = _command_basename(token)
+        if not base:
+            index += 1
+            continue
+        if _is_env_assignment(token):
+            index += 1
+            continue
+        if base in {"sudo", "nohup", "command"}:
+            index += 1
+            continue
+        if base == "env":
+            index += 1
+            while index < len(tokens) and _is_env_assignment(tokens[index]):
+                index += 1
+            continue
+        if base == "timeout":
+            index += 1
+            while index < len(tokens):
+                current = tokens[index]
+                if current.startswith("-") or re.fullmatch(r"\d+(?:\.\d+)?[smhd]?", current):
+                    index += 1
+                    continue
+                break
+            continue
+        return base, tokens[index + 1 :]
+    return None
+
+
+def _match_linux_segment_command(
+    command: str,
+    args: list[str],
+    *,
+    allow_kernel_module_ops: bool,
+) -> str | None:
+    if command in {"shutdown", "reboot", "poweroff", "halt"}:
+        return "禁止主机关机或重启"
+    if command in {"useradd", "userdel", "usermod"}:
+        return "禁止修改系统用户"
+    if command in {"groupadd", "groupdel", "groupmod"}:
+        return "禁止修改系统用户组"
+    if command == "passwd":
+        return "禁止修改系统账户密码"
+    if command in {"insmod", "rmmod", "modprobe"} and not allow_kernel_module_ops:
+        return "禁止加载或卸载内核模块"
+    if command in {"python", "python2", "python3"} and args and args[0] == "-c":
+        return "禁止通过 Python 解释器执行内联代码"
+    if command == "perl" and args and args[0] == "-e":
+        return "禁止通过 Perl 解释器执行内联代码"
+    if command == "ruby" and args and args[0] == "-e":
+        return "禁止通过 Ruby 解释器执行内联代码"
+    if command == "lua" and args and args[0] == "-e":
+        return "禁止通过 Lua 解释器执行内联代码"
+    if command in {"nc", "ncat", "netcat"} and "-e" in args and any(
+        item.lower() in {"/bin/sh", "/bin/bash"} for item in args
+    ):
+        return "禁止通过 netcat 创建反弹 shell"
+    if command == "sysctl" and _is_command_option(args, "-w"):
+        return "禁止直接修改内核运行时参数"
+    if command == "visudo":
+        return "禁止通过 visudo 编辑 sudoers 权限配置"
+    if command in {"flash_erase", "flash_eraseall", "nandwrite", "nanddump"}:
+        return "禁止直接操作嵌入式 NAND/NOR Flash（可永久损坏设备）"
+    if command in {"ubiformat", "ubirmvol", "ubimkvol", "ubirsvol"}:
+        return "禁止操作 UBI Flash 卷（可永久损坏 Flash 分区）"
+    if command == "fw_setenv":
+        return "禁止修改 U-Boot 引导加载程序环境变量"
+    if command == "tcpdump" and _is_command_option(args, "-w"):
+        return "禁止通过 tcpdump 将网络流量捕获写入文件"
+    if command == "kill" and any(arg == "1" for arg in args):
+        return "禁止通过 kill 终止 init/systemd（PID 1）进程"
+    if command == "socat" and any(arg.lower().startswith("exec:") for arg in args):
+        return "禁止通过 socat 创建交互式 shell 或反弹 shell"
+    if command in {"strace", "ltrace"} and (
+        _is_command_option(args, "-p") or _is_command_option(args, "--pid")
+    ):
+        return "禁止通过 strace/ltrace 附加进程（可窃取运行时凭据）"
+    if command == "gdb" and (_is_command_option(args, "-p") or _is_command_option(args, "--pid")):
+        return "禁止通过 gdb 附加进程（可读取任意进程内存）"
+    if command == "nsenter":
+        return "禁止通过 nsenter 进入其他进程命名空间（容器逃逸向量）"
+    if command == "unshare":
+        return "禁止通过 unshare 创建新命名空间（可用于权限逃逸）"
+    if command == "at":
+        return "禁止通过 at 创建定时任务（常见持久化手法，T1053.001）"
+    return None
+
+
+def _match_windows_segment_command(command: str, args: list[str]) -> str | None:
+    if command in {"shutdown", "restart-computer"}:
+        return "禁止主机关机或重启"
+    if command == "net" and len(args) >= 1 and args[0].lower() == "user":
+        return "禁止管理系统用户账户"
+    if command == "net" and len(args) >= 2 and args[0].lower() == "localgroup" and any(
+        arg.lower() == "/add" for arg in args[1:]
+    ):
+        return "禁止将用户添加到本地组（可用于提权）"
+    if command == "reg" and args and args[0].lower() in {"delete", "add", "import", "export"}:
+        return "禁止修改或导出注册表"
+    if command == "vssadmin" and len(args) >= 2 and args[0].lower() == "delete" and args[1].lower() == "shadows":
+        return "禁止删除卷影副本（防范勒索软件）"
+    if command == "wmic" and "shadowcopy" in [arg.lower() for arg in args] and "delete" in [arg.lower() for arg in args]:
+        return "禁止通过 wmic 删除卷影副本（防范勒索软件）"
+    if command == "set-executionpolicy" and args and args[0].lower() in {"bypass", "unrestricted"}:
+        return "禁止绕过 PowerShell 执行策略"
+    if command == "schtasks" and any(arg.lower() == "/create" for arg in args):
+        return "禁止创建计划任务（常见持久化手法）"
+    if command == "wevtutil" and args and args[0].lower() in {"cl", "clear-log"}:
+        return "禁止清除 Windows 事件日志（T1070.001）"
+    if command == "sc" and args and args[0].lower() in {"create", "config", "delete"}:
+        return "禁止创建或修改 Windows 服务（常见持久化手法）"
+    if command == "certutil" and any(arg.lower() == "-urlcache" for arg in args):
+        return "禁止通过 certutil 下载远程文件（LOL-bin）"
+    if command == "mshta":
+        return "禁止通过 mshta 执行 HTA 文件（LOL-bin）"
+    if command == "rundll32":
+        return "禁止通过 rundll32 执行任意 DLL（LOL-bin）"
+    if command == "regsvr32":
+        return "禁止通过 regsvr32 执行脚本（squiblydoo LOL-bin）"
+    if command in {"wscript", "cscript"}:
+        return "禁止通过 wscript/cscript 执行脚本（LOL-bin）"
+    if command in {"set-mppreference", "add-mppreference"} and any(
+        "disable" in arg.lower() or "exclusion" in arg.lower() for arg in args
+    ):
+        return "禁止通过 PowerShell 禁用 Windows Defender 或添加 AV 排除项"
+    return None
+
+
+def _unwrap_windows_wrapper(command: str, args: list[str]) -> str | None:
+    if command == "cmd":
+        for index, arg in enumerate(args):
+            if arg.lower() in {"/c", "/k"} and index + 1 < len(args):
+                return " ".join(args[index + 1 :]).strip()
+        return None
+    if command in {"powershell", "pwsh"}:
+        for index, arg in enumerate(args):
+            lowered = arg.lower()
+            if lowered in {"-command", "/command", "-c"} and index + 1 < len(args):
+                nested = " ".join(args[index + 1 :]).strip().strip('"\'')
+                # 兼容 PowerShell ScriptBlock：& { ... }
+                if nested.startswith("&"):
+                    nested = nested[1:].strip()
+                if nested.startswith("{") and nested.endswith("}"):
+                    nested = nested[1:-1].strip()
+                return nested
+        return None
+    return None
+
+
 def sanitize_args(args: list[str]) -> list[str]:
     sanitized: list[str] = []
     for arg in args:
@@ -182,27 +344,58 @@ def sanitize_args(args: list[str]) -> list[str]:
     return sanitized
 
 
-def is_path_allowed(remote_path: str, allowed_roots: tuple[str, ...]) -> bool:
-    normalized = str(PurePosixPath(remote_path))
+def is_path_allowed(remote_path: str, allowed_roots: tuple[str, ...], os_family: str = "linux") -> bool:
+    normalized = _normalize_remote_path(remote_path, os_family)
     for root in allowed_roots:
-        root_norm = str(PurePosixPath(root))
-        if normalized == root_norm or normalized.startswith(root_norm.rstrip("/") + "/"):
+        root_norm = _normalize_remote_path(root, os_family)
+        if _path_prefix_matches(normalized, root_norm):
             return True
     return False
 
 
-def is_path_denied(remote_path: str, denied_paths: tuple[str, ...]) -> bool:
-    normalized = str(PurePosixPath(remote_path))
+def is_path_denied(remote_path: str, denied_paths: tuple[str, ...], os_family: str = "linux") -> bool:
+    normalized = _normalize_remote_path(remote_path, os_family)
     for blocked in denied_paths:
-        blocked_norm = str(PurePosixPath(blocked))
-        if normalized == blocked_norm or normalized.startswith(blocked_norm.rstrip("/") + "/"):
+        blocked_norm = _normalize_remote_path(blocked, os_family)
+        if _path_prefix_matches(normalized, blocked_norm):
             return True
     return False
 
 
-def match_dangerous_command(command: str, os_family: str) -> str | None:
-    normalized_os = (os_family or "linux").strip().lower() or "linux"
+def match_dangerous_command(
+    command: str,
+    os_family: str,
+    *,
+    allow_kernel_module_ops: bool = False,
+) -> str | None:
+    normalized_os = _normalized_os_family(os_family)
     patterns = _LINUX_DANGEROUS_COMMAND_PATTERNS
+    for segment in _split_shell_segments(command):
+        tokens = _tokenize_segment(segment)
+        effective = _effective_command(tokens)
+        if effective is None:
+            continue
+        command_name, args = effective
+        if normalized_os == "windows":
+            nested_command = _unwrap_windows_wrapper(command_name, args)
+            if nested_command:
+                nested_reason = match_dangerous_command(
+                    nested_command,
+                    os_family,
+                    allow_kernel_module_ops=allow_kernel_module_ops,
+                )
+                if nested_reason:
+                    return nested_reason
+            reason = _match_windows_segment_command(command_name, args)
+        else:
+            reason = _match_linux_segment_command(
+                command_name,
+                args,
+                allow_kernel_module_ops=allow_kernel_module_ops,
+            )
+        if reason:
+            return reason
+
     if normalized_os == "windows":
         patterns = _WINDOWS_DANGEROUS_COMMAND_PATTERNS
 
@@ -217,15 +410,15 @@ def match_sensitive_path(remote_path: str, os_family: str) -> str | None:
 
     命中时返回拒绝原因，否则返回 None。
     """
-    normalized = str(PurePosixPath(remote_path))
-    normalized_os = (os_family or "linux").strip().lower() or "linux"
+    normalized_os = _normalized_os_family(os_family)
+    normalized = _normalize_remote_path(remote_path, normalized_os)
     paths = _LINUX_BUILTIN_SENSITIVE_PATHS
     if normalized_os == "windows":
         paths = _WINDOWS_BUILTIN_SENSITIVE_PATHS
 
     for sensitive in paths:
-        sensitive_norm = str(PurePosixPath(sensitive))
-        if normalized == sensitive_norm or normalized.startswith(sensitive_norm.rstrip("/") + "/"):
+        sensitive_norm = _normalize_remote_path(sensitive, normalized_os)
+        if _path_prefix_matches(normalized, sensitive_norm):
             return f"路径 '{remote_path}' 包含系统敏感信息，禁止访问"
     return None
 
@@ -240,19 +433,22 @@ def scan_command_for_sensitive_paths(
     采用子串匹配：只要敏感/禁止路径的规范化字符串出现在命令中即视为命中。
     命中时返回拒绝原因，否则返回 None。
     """
-    normalized_os = (os_family or "linux").strip().lower() or "linux"
+    normalized_os = _normalized_os_family(os_family)
     builtin_paths = _LINUX_BUILTIN_SENSITIVE_PATHS
     if normalized_os == "windows":
         builtin_paths = _WINDOWS_BUILTIN_SENSITIVE_PATHS
 
     for sensitive in builtin_paths:
-        sensitive_norm = str(PurePosixPath(sensitive))
-        if sensitive_norm in command:
+        sensitive_norm = _normalize_remote_path(sensitive, normalized_os)
+        if _command_references_path(command, sensitive_norm, normalized_os):
             return f"命令中引用了系统敏感路径 '{sensitive_norm}'，禁止执行"
 
+    if normalized_os == "linux" and re.search(r"(^|[^a-zA-Z0-9_./:-])/dev/mtd\d+($|[^a-zA-Z0-9_.-])", command):
+        return "命令中引用了系统敏感路径 '/dev/mtd'，禁止执行"
+
     for blocked in denied_paths:
-        blocked_norm = str(PurePosixPath(blocked)).rstrip("/")
-        if blocked_norm in command:
+        blocked_norm = _normalize_remote_path(blocked, normalized_os).rstrip("/")
+        if _command_references_path(command, blocked_norm, normalized_os):
             return f"命令中引用了被禁止的路径 '{blocked_norm}'，禁止执行"
 
     return None

@@ -98,6 +98,7 @@ class TemplateCategoriesTests(unittest.TestCase):
                 srv.cmd_exec("dev2", "linux_common.list_dir", args=["/tmp"])
 
             self.assertIn("TEMPLATE_NOT_APPLICABLE", str(ctx.exception))
+            self.assertIn("GW-2003", str(ctx.exception))
 
     def test_windows_template_rejected_on_linux_device(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -112,6 +113,7 @@ class TemplateCategoriesTests(unittest.TestCase):
                 srv.cmd_exec("dev1", "windows_common.list_dir", args=["C:/"])
 
             self.assertIn("TEMPLATE_NOT_APPLICABLE", str(ctx.exception))
+            self.assertIn("GW-2003", str(ctx.exception))
 
     def test_missing_os_family_defaults_to_linux(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

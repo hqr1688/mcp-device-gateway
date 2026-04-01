@@ -114,8 +114,14 @@ class SecurityGuardsTests(unittest.TestCase):
     def test_sensitive_path_windows_sam_blocked(self) -> None:
         self.assertIsNotNone(match_sensitive_path("C:/Windows/System32/config/SAM", "windows"))
 
+    def test_sensitive_path_windows_backslash_and_case_blocked(self) -> None:
+        self.assertIsNotNone(match_sensitive_path(r"c:\windows\system32\config\sam", "windows"))
+
     def test_sensitive_path_non_sensitive_allowed(self) -> None:
         self.assertIsNone(match_sensitive_path("/opt/app/config.json", "linux"))
+
+    def test_sensitive_path_traversal_is_blocked_after_normalization(self) -> None:
+        self.assertIsNotNone(match_sensitive_path("/opt/app/../../etc/shadow", "linux"))
 
     def test_sensitive_path_blocks_file_tool_via_guard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -143,6 +149,18 @@ class SecurityGuardsTests(unittest.TestCase):
             srv = importlib.reload(server)
             with self.assertRaises(ValueError) as ctx:
                 srv.file_stat("dev1", "/etc/shadow")
+            self.assertIn("SENSITIVE_PATH_BLOCKED", str(ctx.exception))
+
+    def test_allowed_root_traversal_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_file = Path(tmp_dir) / "devices.test.yaml"
+            self._write_linux_config(config_file)
+            os.environ["MCP_DEVICE_CONFIG"] = str(config_file)
+            os.environ["MCP_AUDIT_LOG"] = str(config_file.parent / "audit.log")
+
+            srv = importlib.reload(server)
+            with self.assertRaises(ValueError) as ctx:
+                srv.file_stat("dev1", "/opt/app/../../etc/shadow")
             self.assertIn("SENSITIVE_PATH_BLOCKED", str(ctx.exception))
 
     # ------------------------------------------------------------------ #
@@ -180,6 +198,54 @@ class SecurityGuardsTests(unittest.TestCase):
 
     def test_linux_insmod_blocked(self) -> None:
         self.assertIsNotNone(match_dangerous_command("insmod /tmp/evil.ko", "linux"))
+
+    def test_linux_insmod_absolute_path_blocked(self) -> None:
+        self.assertIsNotNone(match_dangerous_command("/sbin/insmod /tmp/evil.ko", "linux"))
+
+    def test_linux_insmod_allowed_when_kernel_module_ops_enabled(self) -> None:
+        self.assertIsNone(
+            match_dangerous_command(
+                "insmod /tmp/test.ko",
+                "linux",
+                allow_kernel_module_ops=True,
+            )
+        )
+
+    def test_linux_insmod_absolute_path_allowed_when_kernel_module_ops_enabled(self) -> None:
+        self.assertIsNone(
+            match_dangerous_command(
+                "/usr/sbin/modprobe test_driver",
+                "linux",
+                allow_kernel_module_ops=True,
+            )
+        )
+
+    def test_linux_rmmod_allowed_when_kernel_module_ops_enabled(self) -> None:
+        self.assertIsNone(
+            match_dangerous_command(
+                "rmmod test_driver",
+                "linux",
+                allow_kernel_module_ops=True,
+            )
+        )
+
+    def test_linux_modprobe_allowed_when_kernel_module_ops_enabled(self) -> None:
+        self.assertIsNone(
+            match_dangerous_command(
+                "modprobe test_driver debug=1",
+                "linux",
+                allow_kernel_module_ops=True,
+            )
+        )
+
+    def test_linux_reboot_still_blocked_when_kernel_module_ops_enabled(self) -> None:
+        self.assertIsNotNone(
+            match_dangerous_command(
+                "reboot",
+                "linux",
+                allow_kernel_module_ops=True,
+            )
+        )
 
     def test_linux_passwd_blocked(self) -> None:
         self.assertIsNotNone(match_dangerous_command("passwd root", "linux"))
@@ -287,6 +353,12 @@ class SecurityGuardsTests(unittest.TestCase):
     def test_linux_safe_command_not_blocked(self) -> None:
         self.assertIsNone(match_dangerous_command("echo hello", "linux"))
 
+    def test_linux_echo_reboot_not_blocked(self) -> None:
+        self.assertIsNone(match_dangerous_command("echo reboot", "linux"))
+
+    def test_linux_grep_useradd_not_blocked(self) -> None:
+        self.assertIsNone(match_dangerous_command("grep useradd /var/log/auth.log", "linux"))
+
     # ------------------------------------------------------------------ #
     # Windows 危险命令 - 原有规则                                          #
     # ------------------------------------------------------------------ #
@@ -325,6 +397,31 @@ class SecurityGuardsTests(unittest.TestCase):
 
     def test_windows_safe_command_not_blocked(self) -> None:
         self.assertIsNone(match_dangerous_command("Get-Process", "windows"))
+
+    def test_windows_shutdown_exe_blocked(self) -> None:
+        self.assertIsNotNone(match_dangerous_command("shutdown.exe /r /t 0", "windows"))
+
+    def test_windows_write_output_shutdown_not_blocked(self) -> None:
+        self.assertIsNone(match_dangerous_command("Write-Output shutdown", "windows"))
+
+    def test_windows_cmd_wrapper_shutdown_blocked(self) -> None:
+        self.assertIsNotNone(match_dangerous_command("cmd.exe /c shutdown.exe /r /t 0", "windows"))
+
+    def test_windows_powershell_wrapper_reg_delete_blocked(self) -> None:
+        self.assertIsNotNone(
+            match_dangerous_command(
+                'powershell.exe -Command "reg.exe delete HKLM\\SAM /f"',
+                "windows",
+            )
+        )
+
+    def test_windows_powershell_script_block_reg_delete_blocked(self) -> None:
+        self.assertIsNotNone(
+            match_dangerous_command(
+                'powershell.exe -Command "& {reg.exe delete HKLM\\SAM /f}"',
+                "windows",
+            )
+        )
 
     # ------------------------------------------------------------------ #
     # Windows 危险命令 - 第三轮新增规则（单元级）                           #
@@ -507,6 +604,27 @@ class SecurityGuardsTests(unittest.TestCase):
         result = scan_command_for_sensitive_paths("dir C:/Windows/System32/config", "windows")
         self.assertIsNotNone(result)
 
+    def test_scan_command_blocks_windows_backslash_sensitive_path(self) -> None:
+        result = scan_command_for_sensitive_paths(r"type C:\Windows\System32\drivers\etc\hosts", "windows")
+        self.assertIsNotNone(result)
+
+    def test_scan_command_blocks_windows_case_insensitive_denied_path(self) -> None:
+        result = scan_command_for_sensitive_paths(
+            r"type c:\opt\app\secret\key.pem",
+            "windows",
+            (r"C:\OPT\App\Secret",),
+        )
+        self.assertIsNotNone(result)
+        self.assertIn("c:/opt/app/secret", result)
+
+    def test_scan_command_does_not_false_match_path_prefix(self) -> None:
+        result = scan_command_for_sensitive_paths(
+            "cat /opt/app/secret-archive/readme.txt",
+            "linux",
+            ("/opt/app/secret",),
+        )
+        self.assertIsNone(result)
+
     def test_scan_command_blocks_denied_path(self) -> None:
         result = scan_command_for_sensitive_paths(
             "cat /opt/app/secret/key.pem",
@@ -583,6 +701,62 @@ class SecurityGuardsTests(unittest.TestCase):
             with self.assertRaises(ValueError) as ctx:
                 srv.cmd_exec("dev1", "test_cmd")
             self.assertIn("SENSITIVE_PATH_BLOCKED", str(ctx.exception))
+
+    def test_cmd_exec_allows_kernel_module_ops_when_device_flag_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_file = Path(tmp_dir) / "devices.test.yaml"
+            config_file.write_text(
+                textwrap.dedent(
+                    """
+                    devices:
+                      dev1:
+                        host: 192.168.1.10
+                        username: root
+                        os_family: linux
+                        allow_kernel_module_ops: true
+                        allowed_roots: []
+
+                    command_templates:
+                      load_module: "insmod /tmp/test.ko"
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+            os.environ["MCP_DEVICE_CONFIG"] = str(config_file)
+            os.environ["MCP_AUDIT_LOG"] = str(config_file.parent / "audit.log")
+
+            srv = importlib.reload(server)
+
+            class FakeClient:
+                def __init__(self, *_args: object, **_kwargs: object) -> None:
+                    pass
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb) -> None:
+                    return None
+
+                def exec(self, command: str, timeout_sec: int = 30):
+                    _ = timeout_sec
+
+                    class Result:
+                        exit_code = 0
+                        stdout = command
+                        stderr = ""
+                        elapsed_ms = 1
+
+                    return Result()
+
+            original_client = getattr(srv, "SshDeviceClient")
+            setattr(srv, "SshDeviceClient", FakeClient)
+            try:
+                result = srv.cmd_exec("dev1", "load_module")
+            finally:
+                setattr(srv, "SshDeviceClient", original_client)
+
+            self.assertEqual("insmod /tmp/test.ko", result["results"][0]["stdout"])
 
 
 if __name__ == "__main__":

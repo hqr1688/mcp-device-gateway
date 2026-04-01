@@ -87,6 +87,23 @@ class TemplateRecommendationTests(unittest.TestCase):
             self.assertEqual("cmd_exec", result["recommended_tool"])
             self.assertEqual("list_dir", result["draft"]["command_key"])
             self.assertEqual(["/opt/idm"], result["draft"]["args"])
+            self.assertEqual("sync", result["draft"]["mode"])
+
+    def test_task_recommend_fallbacks_to_cmd_exec_custom_mode_when_no_template_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_file = Path(tmp_dir) / "devices.test.yaml"
+            self._write_config(config_file)
+
+            os.environ["MCP_DEVICE_CONFIG"] = str(config_file)
+            os.environ["MCP_AUDIT_LOG"] = str(config_file.parent / "audit.log")
+
+            srv = importlib.reload(server)
+            result = srv.task_recommend("请执行一个临时脚本检查，不在模板里")
+
+            self.assertEqual("cmd_exec", result["recommended_tool"])
+            self.assertEqual("<custom_command>", result["draft"]["command"])
+            self.assertEqual("sync", result["draft"]["mode"])
+            self.assertIn("command_template_list", result["next_steps"])
 
 
 if __name__ == "__main__":

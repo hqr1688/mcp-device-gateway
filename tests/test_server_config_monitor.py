@@ -121,6 +121,45 @@ class ServerConfigMonitorTests(unittest.TestCase):
             updated = srv.device_list()
             self.assertEqual("192.168.1.20", updated[0]["host"])
 
+    def test_config_reload_closes_connection_pool(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_file = Path(tmp_dir) / "devices.test.yaml"
+            self._write_valid_config(config_file)
+            srv = self._load_server_with_config(config_file)
+            close_calls: list[str] = []
+            original_close_all = srv._pool.close_all
+
+            def fake_close_all() -> None:
+                close_calls.append("closed")
+
+            srv._pool.close_all = fake_close_all
+            try:
+                srv.device_list()
+                self.assertEqual([], close_calls)
+                time.sleep(0.02)
+                config_file.write_text(
+                    textwrap.dedent(
+                        """
+                        devices:
+                            dev1:
+                                host: 192.168.1.99
+                                username: root
+                                allowed_roots:
+                                    - /tmp/
+                        command_templates:
+                            ping: echo ok
+                        """
+                    ).strip()
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+                srv.device_list()
+            finally:
+                srv._pool.close_all = original_close_all
+
+            self.assertEqual(["closed"], close_calls)
+
     def test_invalid_root_yaml_is_blocked_but_service_stays_alive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_file = Path(tmp_dir) / "devices.test.yaml"
@@ -132,7 +171,7 @@ class ServerConfigMonitorTests(unittest.TestCase):
 
             self.assertIn("CONFIG_UNAVAILABLE", str(ctx.exception))
 
-    def test_cmd_exec_batch_keeps_operational_error_as_result(self) -> None:
+    def test_cmd_exec_multi_keeps_operational_error_as_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_file = Path(tmp_dir) / "devices.test.yaml"
             self._write_valid_config(config_file)
@@ -159,14 +198,16 @@ class ServerConfigMonitorTests(unittest.TestCase):
             original_client = getattr(srv, "SshDeviceClient")
             setattr(srv, "SshDeviceClient", FailingClient)
             try:
-                results = srv.cmd_exec_batch("dev1", [{"command_key": "ping"}])
+                result = srv.cmd_exec("dev1", commands=[{"command_key": "ping"}])
             finally:
                 setattr(srv, "SshDeviceClient", original_client)
 
+            results = result["results"]
             self.assertEqual("ping", results[0]["command_key"])
+            self.assertEqual("error", results[0]["status"])
             self.assertEqual("network down", results[0]["error"])
 
-    def test_cmd_exec_batch_does_not_swallow_programming_error(self) -> None:
+    def test_cmd_exec_multi_does_not_swallow_programming_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_file = Path(tmp_dir) / "devices.test.yaml"
             self._write_valid_config(config_file)
@@ -194,7 +235,7 @@ class ServerConfigMonitorTests(unittest.TestCase):
             setattr(srv, "SshDeviceClient", BrokenClient)
             try:
                 with self.assertRaises(AssertionError):
-                    srv.cmd_exec_batch("dev1", [{"command_key": "ping"}])
+                    srv.cmd_exec("dev1", commands=[{"command_key": "ping"}])
             finally:
                 setattr(srv, "SshDeviceClient", original_client)
 
@@ -224,15 +265,32 @@ class ServerConfigMonitorTests(unittest.TestCase):
             resource_names = [item["name"] for item in result["resources"]]
             prompt_names = [item["name"] for item in result["prompts"]]
 
-            self.assertEqual(15, result["tool_count"])
+            self.assertEqual(13, result["tool_count"])
             self.assertEqual(1, result["resource_count"])
             self.assertEqual(1, result["prompt_count"])
             self.assertEqual(result["tool_count"], len(tool_names))
             self.assertEqual(result["resource_count"], len(resource_names))
             self.assertEqual(result["prompt_count"], len(prompt_names))
             self.assertIn("capability_overview", tool_names)
+            self.assertIn("cmd_exec", tool_names)
+            self.assertNotIn("custom_exec", tool_names)
+            self.assertNotIn("custom_exec_async", tool_names)
             self.assertEqual(["config://summary"], resource_names)
             self.assertEqual(["device_ops_prompt"], prompt_names)
+
+    def test_audit_log_parent_directory_is_created_automatically(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_file = Path(tmp_dir) / "devices.test.yaml"
+            self._write_valid_config(config_file)
+            os.environ["MCP_DEVICE_CONFIG"] = str(config_file)
+            nested_log = Path(tmp_dir) / "nested" / "audit" / "events.log"
+            os.environ["MCP_AUDIT_LOG"] = str(nested_log)
+
+            srv = importlib.reload(server)
+            srv.capability_overview()
+
+            self.assertTrue(nested_log.exists())
+            self.assertIn("capability.overview", nested_log.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
