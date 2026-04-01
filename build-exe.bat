@@ -105,6 +105,7 @@ set "PI_ARGS=!PI_ARGS! --paths src"
 set "PI_ARGS=!PI_ARGS! --noconfirm"
 
 :: Collect complete packages that use dynamic imports or C extensions.
+set "PI_ARGS=!PI_ARGS! --collect-all mcp_device_gateway"
 set "PI_ARGS=!PI_ARGS! --collect-all mcp"
 set "PI_ARGS=!PI_ARGS! --collect-all paramiko"
 set "PI_ARGS=!PI_ARGS! --collect-all cryptography"
@@ -112,6 +113,7 @@ set "PI_ARGS=!PI_ARGS! --collect-all pydantic"
 set "PI_ARGS=!PI_ARGS! --collect-all pydantic_core"
 
 :: Single-module hidden imports not found by static analysis.
+set "PI_ARGS=!PI_ARGS! --hidden-import mcp_device_gateway.server"
 set "PI_ARGS=!PI_ARGS! --hidden-import yaml"
 set "PI_ARGS=!PI_ARGS! --hidden-import bcrypt"
 set "PI_ARGS=!PI_ARGS! --hidden-import anyio"
