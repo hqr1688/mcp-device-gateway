@@ -83,12 +83,12 @@
 **任务清单**
 
 - [ ] SSH 连接池：`SshDeviceClient` 改为连接池模式（或带 TTL 的单例缓存），避免每次工具调用重建连接
-- [ ] 新增 MCP 工具 `cmd_exec_batch`：接受 `[(device_name, command_key, args), ...]` 列表，并发执行并汇总结果
+- [ ] 扩展 `cmd_exec`：接受 `[(device_name, command_key, args), ...]` 列表，并发执行并汇总结果
 - [ ] `file_upload` / `file_download` 支持目录递归传输（本地目录 → 远端目录，受白名单约束）
 - [ ] 连接失败重试策略：可配置重试次数与退避间隔
 - [ ] 新增集成测试：使用 `pytest` + Docker `linuxserver/openssh-server` 容器做真实 SSH 环境测试
 
-**验收标准**：连接池命中时延显著降低；`cmd_exec_batch` 对 3 台设备并发执行耗时不超过单次 × 1.2。
+**验收标准**：连接池命中时延显著降低；批量模式对 3 台设备并发执行耗时不超过单次 × 1.2。
 
 ---
 

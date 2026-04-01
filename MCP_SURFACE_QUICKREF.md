@@ -5,7 +5,7 @@
 ## 当前服务面
 
 - 服务名：embedded-device-gateway
-- 暴露面：17 个工具、1 个资源、1 个提示词
+- 暴露面：13 个工具、1 个资源、1 个提示词
 - 当前已加载设备：2 台，分别是“相机”和“虚拟机”
 - 当前已加载模板：23 条
 - 模板风险分布：low 18 条，medium 5 条，high 0 条
@@ -26,12 +26,8 @@
 
 ### 命令执行
 
-- cmd_exec：参数为 device_name、command_key、args、timeout_sec，执行单条 sync 模板并立即返回 stdout、stderr 和 exit_code。
-- cmd_exec_batch：参数为 device_name、commands，按输入顺序返回多条 sync 模板的执行结果，适合并发采集指标。
-- cmd_exec_async：参数为 device_name、command_key、args、timeout_sec，提交 async 模板并返回 job_id。
+- cmd_exec：统一执行入口。单条可传 command_key 或 command；多条可传 commands 列表；每条可独立设置 mode=sync/async。
 - cmd_exec_result：参数为 job_id，返回 running、done 或 error 状态，以及任务结果。
-- custom_exec：参数为 device_name、command、timeout_sec，执行符合安全规则的自定义拼装命令。
-- custom_exec_async：参数为 device_name、command、timeout_sec，异步提交符合安全规则的自定义拼装命令。
 
 ### 文件与目录
 
@@ -43,7 +39,7 @@
 ## 资源与提示词
 
 - config://summary：返回当前配置摘要，包括 config_path、device_count、template_count、devices、templates。
-- device_ops_prompt(task, device_name?)：生成面向 Agent 的推荐调用顺序，强调先 device_list、再 device_ping、再按 exec_mode 选择执行工具。
+- device_ops_prompt(task, device_name?)：生成面向 Agent 的推荐调用顺序，强调先 device_list、再 device_ping、再通过 cmd_exec 统一执行。
 
 ## 模板分类清单
 
@@ -89,6 +85,6 @@
 
 1. 先调用 capability_overview 或 device_list 了解当前服务面。
 2. 再调用 device_profile_get 和 device_ping 确认目标设备是否适合且可达。
-3. 执行前调用 command_template_get，按 exec_mode 在 cmd_exec、cmd_exec_batch、cmd_exec_async 之间选择。
-4. 若模板未覆盖目标任务，可退回到 custom_exec 或 custom_exec_async。
+3. 执行前调用 command_template_get，按场景在 cmd_exec 中为每条命令设置 mode=sync/async。
+4. 若模板未覆盖目标任务，可在 cmd_exec 中使用 command 自定义命令。
 5. 若只知道任务描述，优先使用 task_recommend，再按返回的 recommended_tool 执行。

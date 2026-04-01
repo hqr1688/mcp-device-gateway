@@ -82,7 +82,7 @@
 - `disk_usage`：查询指定路径磁盘用量
 
 ### 2.3 多设备批量操作
-- `cmd_exec_batch`：对设备组并发执行同一命令模板，汇总结果
+- `cmd_exec`（批量扩展）：对设备组并发执行同一命令模板，汇总结果
 - `file_upload_batch`：向多设备分发同一文件（固件广播场景）
 - 设备组（Device Group）配置支持：`groups.yaml` 中定义设备集合
 

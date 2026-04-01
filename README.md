@@ -42,7 +42,7 @@ entrypoint.py                    PyInstaller 构建入口
 
 ## 安全边界
 
-- 优先执行 `command_templates` 中声明的模板；模板未覆盖时可使用 `custom_exec` / `custom_exec_async` 执行受同等安全规则约束的自定义命令
+- 优先执行 `command_templates` 中声明的模板；模板未覆盖时可在 `cmd_exec` 中传入 `command` 执行受同等安全规则约束的自定义命令
 - 所有 cmd_exec 参数都通过 `^[a-zA-Z0-9_./:=+\-]+$` 的 fullmatch 校验
 - 所有远端文件路径都经过 PurePosixPath 规范化并受 allowed_roots 约束
 - 可通过 denied_paths 为单设备显式封禁目录/文件（目录前缀命中即拒绝）
@@ -67,12 +67,8 @@ entrypoint.py                    PyInstaller 构建入口
 
 ### 命令执行
 
-- `cmd_exec`：执行单条同步命令
-- `cmd_exec_batch`：并发执行多条独立同步命令
-- `cmd_exec_async`：提交长耗时任务，立即返回 `job_id`
+- `cmd_exec`：统一执行入口，支持单条/多条命令；每条可独立设置 `mode=sync/async`
 - `cmd_exec_result`：轮询异步任务结果
-- `custom_exec`：执行符合安全规则的自定义拼装命令
-- `custom_exec_async`：异步提交符合安全规则的自定义拼装命令
 
 ### 文件与目录
 
@@ -91,9 +87,9 @@ entrypoint.py                    PyInstaller 构建入口
 1. 先调用 `device_list`，必要时配合 `device_profile_get` 选择目标设备。
 2. 调用 `device_ping` 验证连通性。
 3. 对命令类任务，先用 `task_recommend` 或 `command_template_list`，再用 `command_template_get` 确认 `exec_mode`。
-4. `exec_mode=sync` 时使用 `cmd_exec`；多条独立短命令使用 `cmd_exec_batch`。
-5. `exec_mode=async` 时使用 `cmd_exec_async`，随后调用 `cmd_exec_result` 轮询。
-6. 若模板暂未覆盖目标场景，可改用 `custom_exec` 或 `custom_exec_async`，仍会经过危险命令与敏感路径检查。
+4. 执行命令统一使用 `cmd_exec`：单条传 `command_key`（模板）或 `command`（自定义）；多条传 `commands` 列表。
+5. 每条命令按场景设置 `mode=sync/async`；异步条目提交后调用 `cmd_exec_result` 轮询。
+6. 模板暂未覆盖目标场景时，可在 `cmd_exec` 中改用 `command` 自定义命令，仍会经过危险命令与敏感路径检查。
 7. 文件场景使用 `dir_list`、`file_stat`、`file_upload`、`file_download`。
 
 ## 快速开始
@@ -253,7 +249,7 @@ command_templates:
 
 ### 内置危险命令拦截
 
-命令模板渲染后，或自定义命令提交前，都会按设备 `os_family` 进行危险命令检测，命中后返回 `DANGEROUS_COMMAND_BLOCKED`，命令不会下发到设备。`exec_*` 系列工具（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`、`custom_exec`、`custom_exec_async`）均适用。
+命令模板渲染后，或自定义命令提交前，都会按设备 `os_family` 进行危险命令检测，命中后返回 `DANGEROUS_COMMAND_BLOCKED`，命令不会下发到设备。命令执行统一通过 `cmd_exec`，均适用此拦截逻辑。
 
 #### Linux 拦截项
 
@@ -293,7 +289,7 @@ command_templates:
 
 ### 内置敏感路径拦截
 
-文件类操作（`dir_list`、`file_stat`、`file_upload`、`file_download`）和命令执行（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`、`custom_exec`、`custom_exec_async`）均会检查内置敏感路径。命中后返回 `SENSITIVE_PATH_BLOCKED`，优先级高于 `denied_paths` 和 `allowed_roots` 配置。
+文件类操作（`dir_list`、`file_stat`、`file_upload`、`file_download`）和命令执行（`cmd_exec`）均会检查内置敏感路径。命中后返回 `SENSITIVE_PATH_BLOCKED`，优先级高于 `denied_paths` 和 `allowed_roots` 配置。
 
 文件类工具还要求 `remote_path` 必须是绝对路径：Linux 使用 `/...`，Windows 使用 `C:/...` 形式；相对路径会直接返回 `REMOTE_PATH_MUST_BE_ABSOLUTE`。在进入白名单、黑名单和敏感路径判断前，路径还会先做规范化并消解 `.` / `..`，防止目录穿越绕过校验。
 
@@ -334,13 +330,13 @@ command_templates:
 - `linux_common.<template_key>`
 - `device_specific.<device_name>.<template_key>`
 
-命令执行工具（`cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`）对 `command_key` 的解析规则：
+命令执行工具（`cmd_exec`）对 `command_key` 的解析规则：
 
 - 默认 `strict=false`：优先按完整键精确匹配；未命中时允许按 `short_key` 自动解析（先设备作用域，再全局）。
 - `strict=true`：仅接受完整键，不做短键容错。
 - 解析失败时会返回候选提示，例如 `Did you mean: linux_common.health_check`。
 
-`cmd_exec_batch` 额外支持：
+`cmd_exec` 在多条模式（`commands`）下额外支持：
 
 - `fail_fast=false`（默认）：单条失败不影响其他命令，返回逐条结果（含每条 `status` / `error`）。
 - `fail_fast=true`：遇到第一条校验错误立即失败，行为与历史版本一致。
@@ -362,7 +358,7 @@ command_templates:
 
 统一响应外层（兼容模式）：
 
-- `cmd_exec`、`cmd_exec_batch`、`cmd_exec_async`、`cmd_exec_result`、`custom_exec`、`custom_exec_async`、`command_template_list` 支持 `compat_mode`。
+- `cmd_exec`、`cmd_exec_result`、`command_template_list`、`command_template_get` 支持 `compat_mode`。
 - 默认 `compat_mode=legacy`：返回历史结构，保证旧客户端兼容。
 - `compat_mode=v1_1`：返回统一外层字段：`request_id`、`timestamp`、`api_version`、`status`、`error`、`data`、`meta`。
 - 在 `compat_mode=v1_1` 下，常见业务错误会返回结构化 `error` 对象（`code/message/details/recoverable/suggestion`），而不是直接抛异常。
@@ -375,7 +371,7 @@ command_templates:
 - `GW-1005`：分页大小非法（对应 `INVALID_PAGE_SIZE`）。
 - `GW-2001`：模板未找到（对应 `UNKNOWN_COMMAND_TEMPLATE`）。
 - `GW-2003`：模板不适用于当前设备（对应 `TEMPLATE_NOT_APPLICABLE`）。
-- `GW-2004`：调用工具与模板 `exec_mode` 不匹配（对应 `EXEC_MODE_MISMATCH`）。
+- `GW-2004`：模板声明执行模式与请求模式不匹配（对应 `EXEC_MODE_MISMATCH`）。
 - `GW-3001`：设备未找到（对应 `DEVICE_NOT_FOUND/UNKNOWN_DEVICE`）。
 - `GW-4002`：异步任务未找到（对应 `UNKNOWN_JOB`）。
 
@@ -401,7 +397,7 @@ command_templates:
 - `windows_common.*` 仅允许在 `os_family=windows` 设备执行
 - `linux_common.*` 仅允许在 `os_family=linux` 设备执行
 - `device_specific.*` 仅允许在对应设备执行
-- `cmd_exec` / `cmd_exec_batch` 仅允许执行 `exec_mode=sync` 模板；`cmd_exec_async` 仅允许执行 `exec_mode=async` 模板
+- `cmd_exec` 会校验模板 `exec_mode` 与请求 `mode` 一致（模板 sync 走同步，模板 async 走异步）
 - `file_upload` / `file_download` 在配置了 `MCP_LOCAL_ALLOWED_ROOTS` 时，只允许读写命中的本地根目录
 
 ### 配置不可用时的行为
